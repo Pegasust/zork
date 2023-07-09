@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "lsp",
+]
+resolver = "2"
+
+[workspace.dependencies]
+salsa = "0.17"
