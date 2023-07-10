@@ -6,19 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tracing = "0.1"
-log = "0.4.17"
-serde-json="1.0.82"
-lsp-server="0.7.1"
-lsp-types="0.94"
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-default_features = false
-features = [
-    "env-filter",
-    "fmt",
-    "std",
-    "tracing-log",
-]
-
+# tracing = "0.1"
+# log = "0.4.17"
+# serde_json="1.0.82"
+# lsp-server="0.7.1"
+# lsp-types="0.94"
+#
+# [dependencies.tracing-subscriber]
+# version = "0.3"
+# default_features = false
+# features = [
+#     "env-filter",
+#     "fmt",
+#     "std",
+#     "tracing-log",
+# ]
+#

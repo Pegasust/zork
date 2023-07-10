@@ -4,5 +4,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.metadata.nix]
+pname = "zork"
+version = "0.0.1"
+
 [workspace.dependencies]
-salsa = "0.17"
+# salsa = "0.17"

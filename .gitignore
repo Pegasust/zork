@@ -1,0 +1,12 @@
+# rust artifacts
+target
+
+# Nix stuffs to ignore
+.direnv
+result
+repl-result-out
+
+# std artifacts
+.data
+.local
+.cache
