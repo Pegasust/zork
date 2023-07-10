@@ -29,11 +29,11 @@
         "std": "std"
       },
       "locked": {
-        "lastModified": 1688978210,
-        "narHash": "sha256-YEh8kjxs8PZ7VyfMEaUfsmEKXh19Z+zSElieS1Cd3iI=",
+        "lastModified": 1688978369,
+        "narHash": "sha256-Z27hModNh6rwtP2fqDMs4Yb39sGFQdNm2itsthIm8N4=",
         "ref": "devshell-encapsulation",
-        "rev": "1a8af3361e9222bf67b867b6cf97432e23618e76",
-        "revCount": 102,
+        "rev": "81a92f7937ab134efb7b536e1e189169bf52dd16",
+        "revCount": 103,
         "type": "git",
         "url": "https://git.pegasust.com/pegasust/nix-boost.git"
       },
