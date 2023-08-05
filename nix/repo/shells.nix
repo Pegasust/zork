@@ -18,4 +18,11 @@ in {
     #   }
     # ];
   };
+
+  htran = lib.dev.mkShell {
+    name = "htran-devshell";
+    imports = [
+      inputs.boost.devshellProfiles.htran-rust
+    ];
+  };
 }
