@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "lsp",
+    "codegen",
+    "markup_ungrams",
 ]
 resolver = "2"
 
@@ -9,4 +11,4 @@ pname = "zork"
 version = "0.0.1"
 
 [workspace.dependencies]
-# salsa = "0.17"
+salsa = "^0.16"

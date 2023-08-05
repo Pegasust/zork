@@ -1,0 +1,75 @@
+// Zork's flavor of markup. This is the "strongest" version of
+// markup, suggesting that any "weaker" version will support only
+// subset of Zork, and any "stronger" version is designed to support
+// superset of Zork, thus translation to Zork is lossy.
+//
+// A =      -- non-termnial definition
+// label:A  -- suggested name for field of AST node `B = something:A ','` suggests B.something -> A
+
+// A-Z, a-z, 0-9, -, _, (= optional)
+HashUrlSafe = 'lex:base64url'*;
+PathSegment = 'lex:base64url'*;
+IntNumber = 'lex:int_number';
+// id (user-defined), sha256 (secure), blake2s128 (fast), crc32 (brief), sha1, md5,...
+// NOTE: the content hash depends on unstyled content.
+HashAlgo = 'lex:hash_algo';
+
+AbsolutePath = ('/' PathSegment)* '/'?;
+RelativePath = ('./'? PathSegment ('/' PathSegment)* '/'?);
+FilePath = AbsolutePath | RelativePath;
+ResourcePath = FilePath;
+
+RefConstBlock = ('#:' | '#const:') content_hash:HashUrlSafe;
+RefIdBlock = '#id:' id_hash:HashUrlSafe;
+RefBlock = RefConstBlock | RefIdBlock;
+BlockPath = ResourcePath 
+
+StylizedTokenGroup = 'lex:stylized_token_group';
+
+// Refer to internal or external path along with some text
+//
+// [example](/etc/machine/block/content#const:c5143b)
+// [example](file:///etc/machine/block/content#const:c5143b)
+// [example](sftp://some_admin@content_node_0//etc/machine/block/content#const:c5143b)
+// [example](sftp://my_user@user_content_node_0/knowledge_box0/content#const:c5143b)
+// [example](s3://knowledge_box0-us/content#const:c5143b)
+// [example](s3://key_id:secret@us.s3.cloud/knowledge_box0/content#const:c5143b)
+HrefToken = '[' StylizedTokenGroup ']' '('  ')';
+
+// Embeds image, or some other data with `alt` instead of also containing text
+// embed {alt: Option<String>, resource: Uri, ft_hint: Option<String>, media_hint: Option<Media>}
+//
+// ![](/etc/host/something_with_no_alt.jpeg)
+// ![Midjourney - A girl holding a torch in dark tunnel](./midjourney/girl_torch_tunnel.jpeg)
+// ![2024 spending plan](./finance/plan.xls)
+// ![2023 ledger](./finance/ledger.xls?ft=xls&media=table)
+// ![gNMIc tutorial video](./vids/gnmic_tutorial?ft=mp4&media=video)
+// ![Car prices](./car/prices.pickle?ft=pickle&media=data)
+EmbedToken = 'lex:embed_token';
+
+// `hello world`
+InlineCodeToken = 'lex:inline_code_token';
+
+// codeblock { meta: JsonValue, lang: CodeLang, content: String }
+CodeBlock = 'lex:code_block';
+
+TokenSumTy = HrefToken | EmbedToken | StylizedTextToken | InlineCodeToken;
+
+HeaderBlock = nest:('#' *) TokenSumTy*;
+QuoteBlock = ('|' | '>') TokenSumTy*;
+PlainTextBlock = TokenSumTy*;
+
+BlockSumTy = QuoteBlock | HeaderBlock | CodeBlock | PlainTextBlock;
+
+// Minimum linkable content, inspired by Obsidian flavor, where user can
+// provide their own ID or assert for immutability via content hash
+AddressedBlock = BlockHash BlockSumTy;
+
+BlockHash = BlockIdHash | BlockContentHash;
+BlockIdHash = 'b+id#' HashUrlSafe;
+BlockContentHash = 'b+sha256#' HashUrlSafe;
+
+Block = AddressedBlock | BlockSumTy;
+
+
+

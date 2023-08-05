@@ -1,4 +1,4 @@
-//! Responsible for keeping track of all loaded documen, receives notifications
+//! Responsible for keeping track of all loaded document, receives notifications
 //! about changes to these documents from LSP clients and update its state
 //! internally. 
 //!
@@ -22,3 +22,10 @@
 //! ```
 //! 
 
+pub struct DocumentManager {
+
+}
+
+struct Document {
+
+}
