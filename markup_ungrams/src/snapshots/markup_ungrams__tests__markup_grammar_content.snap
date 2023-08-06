@@ -1,6 +1,5 @@
 ---
 source: markup_ungrams/src/lib.rs
-assertion_line: 58
 expression: markup_grammar().unwrap()
 ---
 Grammar {
