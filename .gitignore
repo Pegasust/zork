@@ -10,3 +10,8 @@ repl-result-out
 .data
 .local
 .cache
+
+# dev artifacts that might be private and not yet available for publicity
+# NOTE: any mention of `.dev` must be optional. Tests with .dev
+# must be able to fail.
+.dev

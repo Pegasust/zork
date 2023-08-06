@@ -7,3 +7,6 @@
 //! data structure. This will make it easier to implement the various features 
 //! your LSP server will provide, such as providing hover information or autocompletion.
 
+mod lexer {
+    
+}
