@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, io::Read};
 
 use lsp_server::{Connection, Message, Notification as NotificationData};
 use lsp_types::{
@@ -8,6 +8,8 @@ use lsp_types::{
     DidChangeTextDocumentParams, VersionedTextDocumentIdentifier, 
     LogMessageParams, MessageType
 };
+
+use ungrammar::Grammar;
 
 fn handle_notification(
     notif: NotificationData,
@@ -33,8 +35,30 @@ fn handle_notification(
                 };
                 lsp.sender.send(Message::Notification(NotificationData {
                     method: LogMessage::METHOD.into(),
-                    params: serde_json::to_value(log_msg).unwrap(),
+                    params: serde_json::to_value(log_msg)?,
                 }))?;
+            }
+
+            let mut file = std::fs::File::open(uri.path())?;
+            let mut ungrammar_str = String::new();
+            file.read_to_string(&mut ungrammar_str)?;
+
+            let parse_err = ungrammar_str.parse::<Grammar>();
+            match parse_err {
+                Ok(grammar) => {
+                    let log_str = format!("Successfully parsed grammar {grammar:?}");
+                    log::debug!("{log_str}");
+                    let log_msg = LogMessageParams {
+                        typ: MessageType::LOG,
+                        message: log_str,
+                    };
+                    lsp.sender.send(Message::Notification(NotificationData {
+                        method: LogMessage::METHOD.into(),
+                        params: serde_json::to_value(log_msg)?,
+                    }))?;
+                },
+                Err(err) => {
+                },
             }
         },
         ignored => {

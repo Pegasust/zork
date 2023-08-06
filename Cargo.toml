@@ -4,6 +4,7 @@ members = [
     "codegen",
     "markup_ungrams",
     "ungrammar_lsp",
+    "ungrammar_fork",
 ]
 resolver = "2"
 

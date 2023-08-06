@@ -25,23 +25,21 @@ to `lspconfig` when we're ready for production
 ```lua
 local function ensure_ungrammar_lspconfig()
   local lspconfig = require('lspconfig')
-  local lspconfig_util = require('lspconfig.util')
   local configs = require('lspconfig.configs')
 
-  if not lspconfig.ungrammar_lsp then
-    configs.ungrammar_lsp = {
+  if not configs['ungrammar_lsp'] then
+    configs['ungrammar_lsp'] = {
       default_config = {
         cmd = { "nix", "run", "github:pegasust/zork#ungrammar_lsp" },
-        filetypes = { "ungram" },
+        filetypes = { "ungrammar", "ungram" },
         root_dir = lspconfig.util.root_pattern(".git", ".ungram"),
         settings = {
-          -- ungrammar lsp settings to be determined
+          -- Your LSP-specific settings
         },
       },
     }
   end
 end
-
 
 ensure_ungrammar_lspconfig()
 ```
@@ -58,11 +56,14 @@ local function setup_ungrammar_handler()
   require('lspconfig').ungrammar_lsp.setup {
     on_attach = on_attach,
     capabilities = capabilities,
-    settings = { 
+    settings = {
       -- ungrammar lsp settings to be determined
     },
   }
 end
+
+
+ensure_ungrammar_lspconfig()
 
 setup_ungrammar_handler()
 ```
