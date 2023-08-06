@@ -12,7 +12,7 @@
 #![deny(rust_2018_idioms)]
 
 mod error;
-mod lexer;
+pub mod lexer;
 mod parser;
 
 use std::{ops, str::FromStr};

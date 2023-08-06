@@ -9,8 +9,10 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// An error encountered when parsing a Grammar.
 #[derive(Debug)]
 pub struct Error {
-    pub(crate) message: String,
-    pub(crate) location: Option<Location>,
+    /// Error message
+    pub message: String,
+    /// Location of the source file where the error was encountered
+    pub location: Option<Location>,
 }
 
 impl fmt::Display for Error {

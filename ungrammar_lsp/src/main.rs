@@ -4,12 +4,13 @@ use lsp_server::{Connection, Message, Notification as NotificationData};
 use lsp_types::{
     InitializeParams, ClientCapabilities, ServerCapabilities, 
     TextDocumentSyncCapability, TextDocumentSyncKind, 
-    notification::{DidChangeTextDocument, Notification, LogMessage}, 
+    notification::{DidChangeTextDocument, Notification, LogMessage, PublishDiagnostics}, 
     DidChangeTextDocumentParams, VersionedTextDocumentIdentifier, 
-    LogMessageParams, MessageType
+    LogMessageParams, MessageType, PublishDiagnosticsParams, Diagnostic, 
+    DiagnosticSeverity, Range,  Position
 };
 
-use ungrammar::Grammar;
+use ungrammar_fork::Grammar;
 
 fn handle_notification(
     notif: NotificationData,
@@ -58,6 +59,21 @@ fn handle_notification(
                     }))?;
                 },
                 Err(err) => {
+                    let diag = PublishDiagnosticsParams {
+                        uri,
+                        diagnostics: vec![
+                            err.into_lsp_diagnostic(
+                                Some(DiagnosticSeverity::ERROR),
+                                Some("ungrammar_lsp".into()),
+                            )
+                        ],
+                        version: None,
+                    };
+
+                    lsp.sender.send(Message::Notification(NotificationData {
+                        method: PublishDiagnostics::METHOD.into(),
+                        params: serde_json::to_value(diag)?,
+                    }))?;
                 },
             }
         },
@@ -130,4 +146,51 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     }
     io_threads.join().map_err(Into::into)
 }
+pub(crate) trait DiagnosticExt {
+    fn range(&self) -> Range;
+    fn msg(&self) -> String;
+    fn into_lsp_diagnostic(
+        self, 
+        severity: Option<DiagnosticSeverity>,
+        source: Option<String>,
+    ) -> Diagnostic 
+    where Self: Sized {
+        Diagnostic { 
+            range: self.range(),
+            message: self.msg(),
+            severity,
+            source,
 
+            code: Default::default(),
+            code_description: Default::default(),
+            related_information: Default::default(),
+            tags: Default::default(),
+            data: Default::default(),
+        }
+    }
+}
+
+
+
+
+impl DiagnosticExt for ungrammar_fork::Error {
+    fn range(&self) -> Range {
+        match self.location {
+            Some(loc) => {
+                let pos = Position {
+                        line: (loc.line - 1).try_into().unwrap(),
+                        character: (loc.column - 1).try_into().unwrap(),
+                    };
+                Range {
+                    start: pos, 
+                    end: pos,
+                }
+            },
+            None => Range::default()
+        }
+    }
+
+    fn msg(&self) -> String {
+        self.message.clone()
+    }
+}

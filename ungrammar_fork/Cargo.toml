@@ -1,5 +1,5 @@
 [package]
-name = "ungrammar"
+name = "ungrammar_fork"
 description = "A DSL for describing concrete syntax trees"
 version = "1.16.1"
 license = "MIT OR Apache-2.0"

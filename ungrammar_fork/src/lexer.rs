@@ -20,10 +20,13 @@ pub(crate) struct Token {
     pub(crate) loc: Location,
 }
 
+/// Source file location
 #[derive(Copy, Clone, Default, Debug)]
-pub(crate) struct Location {
-    pub(crate) line: usize,
-    pub(crate) column: usize,
+pub struct Location {
+    /// 1-indexed row location
+    pub line: usize,
+    /// 1-indexed column location
+    pub column: usize,
 }
 
 impl Location {

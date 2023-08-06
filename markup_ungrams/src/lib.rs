@@ -2,13 +2,13 @@
 
 use ungrammar::{Grammar, Error};
 
-pub(crate) struct ZorkKind<'a> {
+pub struct ZorkKind<'a> {
     // alias -> canonical name
-    pub(crate) codelangs_alias: &'a [(&'a str, &'a str)],
-    pub(crate) punct_trans: &'a [(&'a str, &'a str)],
+    pub codelangs_alias: &'a [(&'a str, &'a str)],
+    pub punct_trans: &'a [(&'a str, &'a str)],
 }
 
-pub(crate) const ZORK_KIND: ZorkKind = ZorkKind {
+pub const ZORK_KIND: ZorkKind = ZorkKind {
     codelangs_alias: &[
         // alias       canon
         ("markdown",   "markdown"),
@@ -44,7 +44,7 @@ pub(crate) const ZORK_KIND: ZorkKind = ZorkKind {
     ],
 };
 
-pub(crate) fn markup_grammar() -> Result<Grammar, Error> {
+pub fn zork_grammar() -> Result<Grammar, Error> {
     let grammar = include_str!("../zork_keg.ungram");
     
     grammar.parse::<Grammar>()
@@ -52,9 +52,9 @@ pub(crate) fn markup_grammar() -> Result<Grammar, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::markup_grammar;
+    use super::zork_grammar;
     #[test]
     fn markup_grammar_content() {
-        insta::assert_debug_snapshot!(markup_grammar().unwrap());
+        insta::assert_debug_snapshot!(zork_grammar().unwrap());
     }
 }
