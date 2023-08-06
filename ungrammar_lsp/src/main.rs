@@ -45,6 +45,7 @@ fn handle_notification(
             file.read_to_string(&mut ungrammar_str)?;
 
             let parse_err = ungrammar_str.parse::<Grammar>();
+            let mut diagnostics: Vec<Diagnostic> = Vec::with_capacity(8);
             match parse_err {
                 Ok(grammar) => {
                     let log_str = format!("Successfully parsed grammar {grammar:?}");
@@ -59,23 +60,21 @@ fn handle_notification(
                     }))?;
                 },
                 Err(err) => {
-                    let diag = PublishDiagnosticsParams {
-                        uri,
-                        diagnostics: vec![
-                            err.into_lsp_diagnostic(
-                                Some(DiagnosticSeverity::ERROR),
-                                Some("ungrammar_lsp".into()),
-                            )
-                        ],
-                        version: None,
-                    };
-
-                    lsp.sender.send(Message::Notification(NotificationData {
-                        method: PublishDiagnostics::METHOD.into(),
-                        params: serde_json::to_value(diag)?,
-                    }))?;
+                    diagnostics.push(err.into_lsp_diagnostic(
+                        Some(DiagnosticSeverity::ERROR),
+                        Some("ungrammar_lsp".into()),
+                    ));
                 },
             }
+            let diag = PublishDiagnosticsParams {
+                uri,
+                diagnostics,
+                version: None,
+            };
+            lsp.sender.send(Message::Notification(NotificationData {
+                method: PublishDiagnostics::METHOD.into(),
+                params: serde_json::to_value(diag)?,
+            }))?;
         },
         ignored => {
             log::warn!(
