@@ -14,17 +14,19 @@
     inputs = inps // {std = std;};
     cellsFrom = ./nix;
     cellBlocks = 
-    let inherit (std.blockTypes) devshells functions installables; 
+    let inherit (std.blockTypes) devshells functions installables runnables; 
     in [
       (functions "shellProfiles")
       (devshells "shells")
       (devshells "userShells")
       (installables "packages")
+      (runnables "apps")
     ];
   } {
     packages = std.harvest self [["repo" "packages"]];
     devShells = std.harvest self [["repo" "shells"] ["repo" "userShells"]];
     devshellProfiles = std.harvest self [["repo" "shellProfiles"]];
+    apps = std.harvest self [["repo" "app"]];
     inherit nixpkgs;
   };
 }

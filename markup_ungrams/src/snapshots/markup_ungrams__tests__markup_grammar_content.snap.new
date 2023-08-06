@@ -1,0 +1,754 @@
+---
+source: markup_ungrams/src/lib.rs
+assertion_line: 58
+expression: markup_grammar().unwrap()
+---
+Grammar {
+    nodes: [
+        NodeData {
+            name: "HashUrlSafe",
+            rule: Rep(
+                Token(
+                    Token(
+                        0,
+                    ),
+                ),
+            ),
+        },
+        NodeData {
+            name: "PathSegment",
+            rule: Rep(
+                Token(
+                    Token(
+                        0,
+                    ),
+                ),
+            ),
+        },
+        NodeData {
+            name: "Ident",
+            rule: Token(
+                Token(
+                    1,
+                ),
+            ),
+        },
+        NodeData {
+            name: "IntNumber",
+            rule: Token(
+                Token(
+                    2,
+                ),
+            ),
+        },
+        NodeData {
+            name: "HashAlgo",
+            rule: Token(
+                Token(
+                    3,
+                ),
+            ),
+        },
+        NodeData {
+            name: "ResourceTransferScheme",
+            rule: Token(
+                Token(
+                    4,
+                ),
+            ),
+        },
+        NodeData {
+            name: "UrlEscapedString",
+            rule: Token(
+                Token(
+                    5,
+                ),
+            ),
+        },
+        NodeData {
+            name: "AbsolutePath",
+            rule: Seq(
+                [
+                    Rep(
+                        Seq(
+                            [
+                                Token(
+                                    Token(
+                                        6,
+                                    ),
+                                ),
+                                Labeled {
+                                    label: "segment",
+                                    rule: Node(
+                                        Node(
+                                            1,
+                                        ),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                    Opt(
+                        Token(
+                            Token(
+                                6,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "RelativePath",
+            rule: Seq(
+                [
+                    Opt(
+                        Token(
+                            Token(
+                                7,
+                            ),
+                        ),
+                    ),
+                    Labeled {
+                        label: "segment",
+                        rule: Node(
+                            Node(
+                                1,
+                            ),
+                        ),
+                    },
+                    Rep(
+                        Seq(
+                            [
+                                Token(
+                                    Token(
+                                        6,
+                                    ),
+                                ),
+                                Node(
+                                    Node(
+                                        1,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                    Opt(
+                        Token(
+                            Token(
+                                6,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "Path",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            7,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            8,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "KvParam",
+            rule: Seq(
+                [
+                    Labeled {
+                        label: "key",
+                        rule: Node(
+                            Node(
+                                2,
+                            ),
+                        ),
+                    },
+                    Seq(
+                        [
+                            Token(
+                                Token(
+                                    8,
+                                ),
+                            ),
+                            Labeled {
+                                label: "value",
+                                rule: Opt(
+                                    Node(
+                                        Node(
+                                            6,
+                                        ),
+                                    ),
+                                ),
+                            },
+                        ],
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "QueryParams",
+            rule: Seq(
+                [
+                    Token(
+                        Token(
+                            9,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            10,
+                        ),
+                    ),
+                    Rep(
+                        Seq(
+                            [
+                                Token(
+                                    Token(
+                                        10,
+                                    ),
+                                ),
+                                Node(
+                                    Node(
+                                        10,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "ResourceUrl",
+            rule: Seq(
+                [
+                    Opt(
+                        Seq(
+                            [
+                                Labeled {
+                                    label: "scheme",
+                                    rule: Node(
+                                        Node(
+                                            5,
+                                        ),
+                                    ),
+                                },
+                                Token(
+                                    Token(
+                                        11,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                    Labeled {
+                        label: "path",
+                        rule: Node(
+                            Node(
+                                9,
+                            ),
+                        ),
+                    },
+                    Labeled {
+                        label: "query",
+                        rule: Node(
+                            Node(
+                                11,
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        },
+        NodeData {
+            name: "RefConstBlock",
+            rule: Seq(
+                [
+                    Alt(
+                        [
+                            Token(
+                                Token(
+                                    12,
+                                ),
+                            ),
+                            Token(
+                                Token(
+                                    13,
+                                ),
+                            ),
+                        ],
+                    ),
+                    Labeled {
+                        label: "content_hash",
+                        rule: Node(
+                            Node(
+                                0,
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        },
+        NodeData {
+            name: "RefIdBlock",
+            rule: Seq(
+                [
+                    Token(
+                        Token(
+                            14,
+                        ),
+                    ),
+                    Labeled {
+                        label: "id_hash",
+                        rule: Node(
+                            Node(
+                                0,
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        },
+        NodeData {
+            name: "RefBlock",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            13,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            14,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "BlockUrl",
+            rule: Seq(
+                [
+                    Labeled {
+                        label: "resource",
+                        rule: Node(
+                            Node(
+                                12,
+                            ),
+                        ),
+                    },
+                    Token(
+                        Token(
+                            15,
+                        ),
+                    ),
+                    Labeled {
+                        label: "block",
+                        rule: Node(
+                            Node(
+                                15,
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        },
+        NodeData {
+            name: "HrefUrl",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            16,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            12,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "StylizedTokenGroup",
+            rule: Token(
+                Token(
+                    16,
+                ),
+            ),
+        },
+        NodeData {
+            name: "HrefToken",
+            rule: Seq(
+                [
+                    Token(
+                        Token(
+                            17,
+                        ),
+                    ),
+                    Labeled {
+                        label: "content",
+                        rule: Node(
+                            Node(
+                                18,
+                            ),
+                        ),
+                    },
+                    Token(
+                        Token(
+                            18,
+                        ),
+                    ),
+                    Token(
+                        Token(
+                            19,
+                        ),
+                    ),
+                    Labeled {
+                        label: "ref",
+                        rule: Node(
+                            Node(
+                                17,
+                            ),
+                        ),
+                    },
+                    Token(
+                        Token(
+                            20,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "EmbedToken",
+            rule: Seq(
+                [
+                    Token(
+                        Token(
+                            21,
+                        ),
+                    ),
+                    Labeled {
+                        label: "alt",
+                        rule: Node(
+                            Node(
+                                18,
+                            ),
+                        ),
+                    },
+                    Token(
+                        Token(
+                            18,
+                        ),
+                    ),
+                    Token(
+                        Token(
+                            19,
+                        ),
+                    ),
+                    Labeled {
+                        label: "resource",
+                        rule: Node(
+                            Node(
+                                12,
+                            ),
+                        ),
+                    },
+                    Token(
+                        Token(
+                            20,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "InlineCodeToken",
+            rule: Token(
+                Token(
+                    22,
+                ),
+            ),
+        },
+        NodeData {
+            name: "CodeBlock",
+            rule: Token(
+                Token(
+                    23,
+                ),
+            ),
+        },
+        NodeData {
+            name: "TokenSumTy",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            19,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            20,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            18,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            21,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "PlainTextBlock",
+            rule: Rep(
+                Node(
+                    Node(
+                        23,
+                    ),
+                ),
+            ),
+        },
+        NodeData {
+            name: "HeaderBlock",
+            rule: Seq(
+                [
+                    Labeled {
+                        label: "depth",
+                        rule: Rep(
+                            Token(
+                                Token(
+                                    15,
+                                ),
+                            ),
+                        ),
+                    },
+                    Rep(
+                        Node(
+                            Node(
+                                23,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "QuoteBlock",
+            rule: Seq(
+                [
+                    Alt(
+                        [
+                            Token(
+                                Token(
+                                    24,
+                                ),
+                            ),
+                            Token(
+                                Token(
+                                    25,
+                                ),
+                            ),
+                        ],
+                    ),
+                    Rep(
+                        Node(
+                            Node(
+                                23,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "BlockSumTy",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            26,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            25,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            22,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            24,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "BlockHash",
+            rule: Seq(
+                [
+                    Token(
+                        Token(
+                            26,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            4,
+                        ),
+                    ),
+                    Token(
+                        Token(
+                            15,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            0,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "AddressedBlock",
+            rule: Seq(
+                [
+                    Node(
+                        Node(
+                            28,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            27,
+                        ),
+                    ),
+                ],
+            ),
+        },
+        NodeData {
+            name: "Block",
+            rule: Alt(
+                [
+                    Node(
+                        Node(
+                            29,
+                        ),
+                    ),
+                    Node(
+                        Node(
+                            27,
+                        ),
+                    ),
+                ],
+            ),
+        },
+    ],
+    tokens: [
+        TokenData {
+            name: "lex:base64url",
+        },
+        TokenData {
+            name: "lex:ident",
+        },
+        TokenData {
+            name: "lex:int_number",
+        },
+        TokenData {
+            name: "lex:hash_algo",
+        },
+        TokenData {
+            name: "lex:resource_transfer_scheme",
+        },
+        TokenData {
+            name: "lex:url_escaped_string",
+        },
+        TokenData {
+            name: "/",
+        },
+        TokenData {
+            name: "./",
+        },
+        TokenData {
+            name: "=",
+        },
+        TokenData {
+            name: "?",
+        },
+        TokenData {
+            name: "&",
+        },
+        TokenData {
+            name: "://",
+        },
+        TokenData {
+            name: ":",
+        },
+        TokenData {
+            name: "const:",
+        },
+        TokenData {
+            name: "id:",
+        },
+        TokenData {
+            name: "#",
+        },
+        TokenData {
+            name: "lex:stylized_token_group",
+        },
+        TokenData {
+            name: "[",
+        },
+        TokenData {
+            name: "]",
+        },
+        TokenData {
+            name: "(",
+        },
+        TokenData {
+            name: ")",
+        },
+        TokenData {
+            name: "![",
+        },
+        TokenData {
+            name: "lex:inline_code_token",
+        },
+        TokenData {
+            name: "lex:code_block",
+        },
+        TokenData {
+            name: "|",
+        },
+        TokenData {
+            name: ">",
+        },
+        TokenData {
+            name: "b+",
+        },
+    ],
+}

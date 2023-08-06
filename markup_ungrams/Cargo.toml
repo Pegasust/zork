@@ -2,6 +2,8 @@
 name="markup_ungrams"
 version = "0.1.0"
 edition = "2021"
+description = "Specify rules"
 
 [dependencies]
 ungrammar = "^1.1.3"
+insta = "^1.31.0"

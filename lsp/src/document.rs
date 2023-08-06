@@ -22,10 +22,3 @@
 //! ```
 //! 
 
-pub struct DocumentManager {
-
-}
-
-struct Document {
-
-}

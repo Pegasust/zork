@@ -52,5 +52,9 @@ pub(crate) fn markup_grammar() -> Result<Grammar, Error> {
 
 #[cfg(test)]
 mod tests {
-    
+    use super::markup_grammar;
+    #[test]
+    fn markup_grammar_content() {
+        insta::assert_debug_snapshot!(markup_grammar().unwrap());
+    }
 }

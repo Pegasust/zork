@@ -7,24 +7,36 @@
 // label:A  -- suggested name for field of AST node `B = something:A ','` suggests B.something -> A
 
 // A-Z, a-z, 0-9, -, _, (= optional)
-HashUrlSafe = 'lex:base64url'*;
-PathSegment = 'lex:base64url'*;
-IntNumber = 'lex:int_number';
+HashUrlSafe = 'lex:base64url' *
+PathSegment = 'lex:base64url' *
+Ident = 'lex:ident'
+IntNumber = 'lex:int_number'
 // id (user-defined), sha256 (secure), blake2s128 (fast), crc32 (brief), sha1, md5,...
 // NOTE: the content hash depends on unstyled content.
-HashAlgo = 'lex:hash_algo';
+HashAlgo = 'lex:hash_algo'
+// file, http, https, s3, sftp
+ResourceTransferScheme = 'lex:resource_transfer_scheme'
+UrlEscapedString = 'lex:url_escaped_string'
 
-AbsolutePath = ('/' PathSegment)* '/'?;
-RelativePath = ('./'? PathSegment ('/' PathSegment)* '/'?);
-FilePath = AbsolutePath | RelativePath;
-ResourcePath = FilePath;
+AbsolutePath = ('/' segment:PathSegment)* '/'?
+RelativePath = ('./'? segment:PathSegment ('/' PathSegment)* '/'?)
+Path = AbsolutePath | RelativePath
 
-RefConstBlock = ('#:' | '#const:') content_hash:HashUrlSafe;
-RefIdBlock = '#id:' id_hash:HashUrlSafe;
-RefBlock = RefConstBlock | RefIdBlock;
-BlockPath = ResourcePath 
+KvParam = key:Ident ('=' value:UrlEscapedString?)
+QueryParams = '?' KvParam ('&' KvParam)*
 
-StylizedTokenGroup = 'lex:stylized_token_group';
+// This is essentually a sugar that supports both "relative url" (./something)
+// and "absolute url" (file://./something)
+ResourceUrl = (scheme:ResourceTransferScheme '://')? path:Path query:QueryParams
+
+RefConstBlock = (':' | 'const:') content_hash:HashUrlSafe
+RefIdBlock = 'id:' id_hash:HashUrlSafe
+RefBlock = RefConstBlock | RefIdBlock
+BlockUrl = resource:ResourceUrl '#' block:RefBlock
+
+HrefUrl = BlockUrl | ResourceUrl
+
+StylizedTokenGroup = 'lex:stylized_token_group'
 
 // Refer to internal or external path along with some text
 //
@@ -34,7 +46,7 @@ StylizedTokenGroup = 'lex:stylized_token_group';
 // [example](sftp://my_user@user_content_node_0/knowledge_box0/content#const:c5143b)
 // [example](s3://knowledge_box0-us/content#const:c5143b)
 // [example](s3://key_id:secret@us.s3.cloud/knowledge_box0/content#const:c5143b)
-HrefToken = '[' StylizedTokenGroup ']' '('  ')';
+HrefToken = '[' content:StylizedTokenGroup ']' '(' ref:HrefUrl ')'
 
 // Embeds image, or some other data with `alt` instead of also containing text
 // embed {alt: Option<String>, resource: Uri, ft_hint: Option<String>, media_hint: Option<Media>}
@@ -45,31 +57,27 @@ HrefToken = '[' StylizedTokenGroup ']' '('  ')';
 // ![2023 ledger](./finance/ledger.xls?ft=xls&media=table)
 // ![gNMIc tutorial video](./vids/gnmic_tutorial?ft=mp4&media=video)
 // ![Car prices](./car/prices.pickle?ft=pickle&media=data)
-EmbedToken = 'lex:embed_token';
+EmbedToken = '![' alt:StylizedTokenGroup ']' '(' resource:ResourceUrl ')'
 
 // `hello world`
-InlineCodeToken = 'lex:inline_code_token';
+InlineCodeToken = 'lex:inline_code_token'
 
 // codeblock { meta: JsonValue, lang: CodeLang, content: String }
-CodeBlock = 'lex:code_block';
+CodeBlock = 'lex:code_block'
 
-TokenSumTy = HrefToken | EmbedToken | StylizedTextToken | InlineCodeToken;
+TokenSumTy = HrefToken | EmbedToken | StylizedTokenGroup | InlineCodeToken
 
-HeaderBlock = nest:('#' *) TokenSumTy*;
-QuoteBlock = ('|' | '>') TokenSumTy*;
-PlainTextBlock = TokenSumTy*;
+PlainTextBlock = TokenSumTy*
+HeaderBlock = depth:('#' *) TokenSumTy*
+QuoteBlock = ('|' | '>') TokenSumTy*
 
-BlockSumTy = QuoteBlock | HeaderBlock | CodeBlock | PlainTextBlock;
+BlockSumTy = QuoteBlock | HeaderBlock | CodeBlock | PlainTextBlock
+
+BlockHash = 'b+' HashAlgo '#' HashUrlSafe
 
 // Minimum linkable content, inspired by Obsidian flavor, where user can
 // provide their own ID or assert for immutability via content hash
-AddressedBlock = BlockHash BlockSumTy;
+AddressedBlock = BlockHash BlockSumTy
 
-BlockHash = BlockIdHash | BlockContentHash;
-BlockIdHash = 'b+id#' HashUrlSafe;
-BlockContentHash = 'b+sha256#' HashUrlSafe;
-
-Block = AddressedBlock | BlockSumTy;
-
-
+Block = AddressedBlock | BlockSumTy
 
