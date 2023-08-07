@@ -1,13 +1,14 @@
 use std::{error::Error, io::Read};
 
-use lsp_server::{Connection, Message, Notification as NotificationData};
+use env_logger::Env;
+use lsp_server::{Connection, Message, Notification as NotificationData, Response};
 use lsp_types::{
     InitializeParams, ClientCapabilities, ServerCapabilities, 
     TextDocumentSyncCapability, TextDocumentSyncKind, 
     notification::{DidChangeTextDocument, Notification, LogMessage, PublishDiagnostics}, 
     DidChangeTextDocumentParams, VersionedTextDocumentIdentifier, 
     LogMessageParams, MessageType, PublishDiagnosticsParams, Diagnostic, 
-    DiagnosticSeverity, Range,  Position
+    DiagnosticSeverity, Range,  Position, request::{Shutdown, Request}
 };
 
 use ungrammar_fork::Grammar;
@@ -86,6 +87,10 @@ fn handle_notification(
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    env_logger::Builder::from_env(
+        Env::default().default_filter_or("debug")
+    ).init();
+
     let (connection, io_threads) = Connection::stdio();
 
     // Run the server
@@ -120,10 +125,13 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     for message in &connection.receiver {
         log::debug!{"received {message:?}"}
         match message {
-            Message::Request(req) if req.method == "shutdown" => {
+            Message::Request(req) if req.method == Shutdown::METHOD => {
                 log::info!{"shutdown initiated"};
-                // Handle the LSP shutdown request.
-                connection.sender.send(req.into()).unwrap();
+                connection.sender.send(Message::Response(Response {
+                    id: req.id,
+                    result: None,
+                    error: None,
+                }))?;
             }
             Message::Request(req) => {
                 log::warn!(
@@ -168,8 +176,6 @@ pub(crate) trait DiagnosticExt {
         }
     }
 }
-
-
 
 
 impl DiagnosticExt for ungrammar_fork::Error {

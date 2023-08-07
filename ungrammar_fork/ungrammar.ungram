@@ -1,6 +1,6 @@
 /// ungrammar for ungrammar
 Grammar =
-  Node *
+  ode *
 
 Node =
   name:'ident' '=' Rule
