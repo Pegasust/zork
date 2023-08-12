@@ -11,7 +11,7 @@ use lsp_types::{
 };
 
 use tracing_subscriber::{fmt, EnvFilter};
-use tracing::{instrument, warn, debug, info, error};
+use tracing::{instrument, warn, debug, info, error, event};
 
 use ungrammar_fork::Grammar;
 
@@ -93,7 +93,9 @@ fn handle_notification(
 
 #[instrument]
 fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
+    event!{"pre: init stdio connection"}
     let (connection, io_threads) = Connection::stdio();
+    event!{"post: init stdio connection"}
 
     // Run the server
     let (id, params) = connection.initialize_start()?;
