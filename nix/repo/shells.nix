@@ -1,4 +1,7 @@
-{inputs, cell}: let 
+{
+  inputs,
+  cell,
+}: let
   inherit (inputs.std) std lib;
   pkgs = inputs.nixpkgs;
 in {
@@ -23,6 +26,12 @@ in {
     name = "htran-devshell";
     imports = [
       inputs.boost.devshellProfiles.htran-rust
+    ];
+    commands = [
+      {
+        category = "devtool";
+        package = cell.packages.ungrammar_lsp;
+      }
     ];
   };
 }

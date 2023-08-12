@@ -1,19 +1,27 @@
-use std::{error::Error, io::Read};
+use std::{error::Error, io::Read, path::PathBuf};
 
 use lsp_server::{Connection, Message, Notification as NotificationData, Response};
 use lsp_types::{
     InitializeParams, ClientCapabilities, ServerCapabilities, 
     TextDocumentSyncCapability, TextDocumentSyncKind, 
-    notification::{DidChangeTextDocument, Notification, LogMessage, PublishDiagnostics}, 
+    notification::{
+        DidChangeTextDocument, Notification, LogMessage, PublishDiagnostics, 
+        DidSaveTextDocument
+    }, 
     DidChangeTextDocumentParams, VersionedTextDocumentIdentifier, 
     LogMessageParams, MessageType, PublishDiagnosticsParams, Diagnostic, 
-    DiagnosticSeverity, Range,  Position, request::{Shutdown, Request}
+    DiagnosticSeverity, Range,  Position, request::{
+        Shutdown, Request
+    }, 
+    DidSaveTextDocumentParams, TextDocumentIdentifier
 };
 
 use tracing_subscriber::{fmt, EnvFilter};
-use tracing::{instrument, warn, debug, info, error, event};
+use tracing::{instrument, warn, debug, info, error, metadata::LevelFilter};
 
 use ungrammar_fork::Grammar;
+
+const BINARY_NAME: &str = "ungrammar_lsp";
 
 #[instrument(skip(lsp))]
 fn handle_notification(
@@ -21,41 +29,47 @@ fn handle_notification(
     lsp: &Connection
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let method: &str = &notif.method;
+    debug! {?notif, "got notification"};
     match method {
-        DidChangeTextDocument::METHOD => {
-            let params: DidChangeTextDocumentParams = notif.extract(
-                DidChangeTextDocument::METHOD
-            ).unwrap();
-
-            let VersionedTextDocumentIdentifier{
-                version: _, uri
-            } = params.text_document;
-
-            warn!("Not yet handling document changes");
-
-            if uri.scheme() != "file" {
-                let scheme = uri.scheme();
-                warn!("Got {uri} not supported uri scheme {scheme}");
-                let log_msg = LogMessageParams{
-                    typ: MessageType::WARNING,
-                    message: format!("Only support file:// schema, got {uri}"),
+        DidSaveTextDocument::METHOD => {
+            let DidSaveTextDocumentParams {
+                text_document: TextDocumentIdentifier {uri},
+                text
+            } = notif.extract(
+                DidSaveTextDocument::METHOD
+            )?;
+            let ungrammar_str = if let Some(text) = text {
+                text
+            } else {
+                debug! {
+                    document_uri=%uri,
+                    "Text not streamed from connection, we're instead reading \
+                    the file instead",
                 };
-                lsp.sender.send(Message::Notification(NotificationData {
-                    method: LogMessage::METHOD.into(),
-                    params: serde_json::to_value(log_msg)?,
-                }))?;
-            }
+                if uri.scheme() != "file" {
+                    let scheme = uri.scheme();
+                    warn!("Got {uri} not supported uri scheme {scheme}");
+                    let log_msg = LogMessageParams{
+                        typ: MessageType::WARNING,
+                        message: format!("Only support file:// schema, got {uri}"),
+                    };
+                    lsp.sender.send(Message::Notification(NotificationData {
+                        method: LogMessage::METHOD.into(),
+                        params: serde_json::to_value(log_msg)?,
+                    }))?;
+                }
 
-            let mut file = std::fs::File::open(uri.path())?;
-            let mut ungrammar_str = String::new();
-            file.read_to_string(&mut ungrammar_str)?;
-
+                let mut file = std::fs::File::open(uri.path())?;
+                let mut ungrammar_str = String::new();
+                file.read_to_string(&mut ungrammar_str)?;
+                ungrammar_str
+            };
             let parse_err = ungrammar_str.parse::<Grammar>();
             let mut diagnostics: Vec<Diagnostic> = Vec::with_capacity(8);
             match parse_err {
                 Ok(grammar) => {
                     let log_str = format!("Successfully parsed grammar {grammar:?}");
-                    debug!("{log_str}");
+                    debug!(?grammar, "Successfully parsed grammar");
                     let log_msg = LogMessageParams {
                         typ: MessageType::LOG,
                         message: log_str,
@@ -68,7 +82,7 @@ fn handle_notification(
                 Err(err) => {
                     diagnostics.push(err.into_lsp_diagnostic(
                         Some(DiagnosticSeverity::ERROR),
-                        Some("ungrammar_lsp".into()),
+                        Some(BINARY_NAME.into()),
                     ));
                 },
             }
@@ -81,6 +95,20 @@ fn handle_notification(
                 method: PublishDiagnostics::METHOD.into(),
                 params: serde_json::to_value(diag)?,
             }))?;
+            
+        }
+        DidChangeTextDocument::METHOD => {
+            info! {"Ignore didChange for simplicity"};
+            let params: DidChangeTextDocumentParams = notif.extract(
+                DidChangeTextDocument::METHOD
+            ).unwrap();
+
+            let VersionedTextDocumentIdentifier{
+                version: _, uri
+            } = params.text_document;
+
+            warn!("Not yet handling document changes");
+
         },
         ignored => {
             warn!(
@@ -119,7 +147,7 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
     let initialize_data = serde_json::json!({
         "capabilities": negotiated_capabilities,
         "serverInfo": {
-            "name": "ungrammar_lsp",
+            "name": BINARY_NAME,
             "version": "dev"
         }
     });
@@ -159,8 +187,22 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
 }
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    let filter = EnvFilter::try_new("debug")?;
-    fmt::Subscriber::builder().with_env_filter(filter).try_init()?;
+    let xdg_dirs = xdg::BaseDirectories::with_prefix(BINARY_NAME);
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::DEBUG.into())
+        .from_env_lossy();
+    let ungrammar_lsp_conf = {
+        match std::env::var("UNGRAMMAR_LSP_CONF") {
+            Ok(e) => PathBuf::from(e),
+            Err(_) => {
+                xdg_dirs?.place_config_file(PathBuf::from("ungrammar_lsp.toml"))?
+            }
+        }
+    };
+    fmt::Subscriber::builder()
+        .with_env_filter(filter)
+        .with_writer(std::io::stderr)
+        .try_init()?;
     lsp_main()
 }
 pub(crate) trait DiagnosticExt {

@@ -14,3 +14,4 @@ log = {workspace = true}
 serde_json = {workspace = true}
 ungrammar_fork = {workspace = true}
 opentelemetry-otlp = {workspace=true}
+xdg = {workspace=true}
