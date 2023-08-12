@@ -93,9 +93,9 @@ fn handle_notification(
 
 #[instrument]
 fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
-    event!{"pre: init stdio connection"}
+    debug!{"pre: init stdio connection"};
     let (connection, io_threads) = Connection::stdio();
-    event!{"post: init stdio connection"}
+    debug!{"post: init stdio connection"};
 
     // Run the server
     let (id, params) = connection.initialize_start()?;
