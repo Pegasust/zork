@@ -11,8 +11,12 @@ use lsp_types::{
     DiagnosticSeverity, Range,  Position, request::{Shutdown, Request}
 };
 
+use tracing_subscriber::fmt;
+use tracing::{instrument, warn, debug, info, error};
+
 use ungrammar_fork::Grammar;
 
+#[instrument(skip(lsp))]
 fn handle_notification(
     notif: NotificationData,
     lsp: &Connection
@@ -28,9 +32,11 @@ fn handle_notification(
                 version: _, uri
             } = params.text_document;
 
+            warn!("Not yet handling document changes");
+
             if uri.scheme() != "file" {
                 let scheme = uri.scheme();
-                log::warn!("Got {uri} not supported uri scheme {scheme}");
+                warn!("Got {uri} not supported uri scheme {scheme}");
                 let log_msg = LogMessageParams{
                     typ: MessageType::WARNING,
                     message: format!("Only support file:// schema, got {uri}"),
@@ -50,7 +56,7 @@ fn handle_notification(
             match parse_err {
                 Ok(grammar) => {
                     let log_str = format!("Successfully parsed grammar {grammar:?}");
-                    log::debug!("{log_str}");
+                    debug!("{log_str}");
                     let log_msg = LogMessageParams {
                         typ: MessageType::LOG,
                         message: log_str,
@@ -78,7 +84,7 @@ fn handle_notification(
             }))?;
         },
         ignored => {
-            log::warn!(
+            warn!(
                 "Unhandled method {ignored:?} {notif:?}. Might be bad capabilities."
             );
         }
@@ -86,10 +92,16 @@ fn handle_notification(
     Ok(())
 }
 
+#[instrument]
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    // NOTE: probably should take control over what the max_level is, just in
+    // case tracing_subscriber::fmt doesn't know which level to look for
+    let log_env = Env::default().default_filter_or("debug");
     env_logger::Builder::from_env(
-        Env::default().default_filter_or("debug")
-    ).init();
+        log_env
+    ).try_init()?;
+
+    fmt::try_init()?;
 
     let (connection, io_threads) = Connection::stdio();
 
@@ -98,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     let init_params: InitializeParams = serde_json::from_value(params).unwrap();
     let client_capabilities: ClientCapabilities = init_params.capabilities;
-    log::info! {"Client cap: {client_capabilities:?}"};
+    info! {"Client cap: {client_capabilities:?}"};
     let server_capabilities = ServerCapabilities {
         text_document_sync: Some(
             TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
@@ -108,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
 
 
-    log::info! {"Server cap: {server_capabilities:?}"};
+    info! {"Server cap: {server_capabilities:?}"};
     // TODO: This is fine because negotiated capabilities will always be
     // subset of client-submitted capabilities at early dev
     let negotiated_capabilities = server_capabilities;
@@ -123,10 +135,10 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     connection.initialize_finish(id, initialize_data)?;
     // Main loop where the LSP server listens for client messages.
     for message in &connection.receiver {
-        log::debug!{"received {message:?}"}
+        debug!{"received {message:?}"}
         match message {
             Message::Request(req) if req.method == Shutdown::METHOD => {
-                log::info!{"shutdown initiated"};
+                info!{"shutdown initiated"};
                 connection.sender.send(Message::Response(Response {
                     id: req.id,
                     result: None,
@@ -134,7 +146,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 }))?;
             }
             Message::Request(req) => {
-                log::warn!(
+                warn!(
                     "client sends req {req:?}, not sure how to handle. \
                     There might be a server-client capabilities misunderstanding."
                 );
@@ -143,11 +155,11 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
                 let notif = notification.clone();
                 let notif_dbg = format!("{notif:?}");
                 if let Err(err) = handle_notification(notification, &connection) {
-                    log::error!("Error handling notif {notif_dbg}: {err}")
+                    error!("Error handling notif {notif_dbg}: {err}")
                 }
             }
             ignore => {
-                log::info!{"ignoring {ignore:?}"};
+                info!{"ignoring {ignore:?}"};
             }
         }
     }

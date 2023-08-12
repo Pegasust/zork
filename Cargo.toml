@@ -22,6 +22,7 @@ rowan = "^0.15.11"
 tracing = "^0.1"
 ungrammar = "^1.1.3"
 serde_json="^1.0.82"
+opentelemetry-otlp="^0.13.0"
 
 [workspace.dependencies.log]
 version = "^0.4.17"
