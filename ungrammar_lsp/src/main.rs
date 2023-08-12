@@ -1,6 +1,5 @@
 use std::{error::Error, io::Read};
 
-use env_logger::Env;
 use lsp_server::{Connection, Message, Notification as NotificationData, Response};
 use lsp_types::{
     InitializeParams, ClientCapabilities, ServerCapabilities, 
@@ -11,7 +10,7 @@ use lsp_types::{
     DiagnosticSeverity, Range,  Position, request::{Shutdown, Request}
 };
 
-use tracing_subscriber::fmt;
+use tracing_subscriber::{fmt, EnvFilter};
 use tracing::{instrument, warn, debug, info, error};
 
 use ungrammar_fork::Grammar;
@@ -93,16 +92,7 @@ fn handle_notification(
 }
 
 #[instrument]
-fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
-    // NOTE: probably should take control over what the max_level is, just in
-    // case tracing_subscriber::fmt doesn't know which level to look for
-    let log_env = Env::default().default_filter_or("debug");
-    env_logger::Builder::from_env(
-        log_env
-    ).try_init()?;
-
-    fmt::try_init()?;
-
+fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
     let (connection, io_threads) = Connection::stdio();
 
     // Run the server
@@ -164,6 +154,12 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         }
     }
     io_threads.join().map_err(Into::into)
+}
+
+fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    let filter = EnvFilter::try_new("debug")?;
+    fmt::Subscriber::builder().with_env_filter(filter).try_init()?;
+    lsp_main()
 }
 pub(crate) trait DiagnosticExt {
     fn range(&self) -> Range;
