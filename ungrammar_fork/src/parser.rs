@@ -3,14 +3,19 @@ use std::collections::HashMap;
 
 use crate::{
     error::{bail, format_err, Result},
-    lexer::{self, TokenKind},
+    lexer::{self, TokenKind, Location, Range},
     Grammar, Node, NodeData, Rule, Token, TokenData,
 };
 
 macro_rules! bail {
-    ($loc:expr, $($tt:tt)*) => {{
-        let err = $crate::error::format_err!($($tt)*)
-            .with_location($loc);
+    ($loc_begin:expr, $loc_end:expr, $($tt:tt)*) => {{
+        let err = $crate::error::Error::Range {
+            message: format!($($tt)*),
+            range: Range {
+                begin: $loc_begin,
+                ex_end: $loc_end,
+            }
+        };
         return Err(err);
     }};
 }
@@ -28,6 +33,8 @@ struct Parser {
     grammar: Grammar,
     tokens: Vec<lexer::Token>,
     node_table: HashMap<String, Node>,
+    node_usage: HashMap<Node, Vec<Range>>,
+    node_decl: HashMap<Node, Vec<Range>>,
     token_table: HashMap<String, Token>,
 }
 
@@ -56,7 +63,7 @@ impl Parser {
     fn expect(&mut self, kind: TokenKind, what: &str) -> Result<()> {
         let token = self.bump()?;
         if token.kind != kind {
-            bail!(token.loc, "unexpected token, expected `{}`", what);
+            bail!(token.loc, token.end_location(), "unexpected token, expected `{}`", what);
         }
         Ok(())
     }
@@ -66,11 +73,27 @@ impl Parser {
     fn finish(self) -> Result<Grammar> {
         for node_data in &self.grammar.nodes {
             if matches!(node_data.rule, DUMMY_RULE) {
-                crate::error::bail!("Undefined node: {}", node_data.name)
+                let node_ranges = self.node_table.get(&node_data.name)
+                    .and_then(|node| self.node_usage.get(node));
+                match node_ranges {
+                    Some(node_ranges) => bail!{
+                        node_ranges[0].begin, node_ranges[0].ex_end,
+                        "Undefined node {}", node_data.name,
+                    },
+                    None => crate::error::bail!("Undefined node: {}", node_data.name),
+                };
             }
         }
         Ok(self.grammar)
     }
+    fn register_node_usage(&mut self, node: &Node, range: Range) {
+        self.node_usage.entry(*node).or_insert(Vec::with_capacity(8)).push(range);
+    }
+
+    fn register_node_decl(&mut self, node: &Node, range: Range) {
+        self.node_decl.entry(*node).or_insert(Vec::with_capacity(8)).push(range);
+    }
+
     fn intern_node(&mut self, name: String) -> Node {
         let len = self.node_table.len();
         let grammar = &mut self.grammar;
@@ -94,13 +117,19 @@ impl Parser {
 
 fn node(p: &mut Parser) -> Result<()> {
     let token = p.bump()?;
-    let node = match token.kind {
-        TokenKind::Node(it) => p.intern_node(it),
-        _ => bail!(token.loc, "expected ident"),
+    let node = match &token.kind {
+        TokenKind::Node(it) => {
+            let node = p.intern_node(it.into());
+            p.register_node_decl(&node, token.range());
+            node
+        },
+        _ => bail!(token.loc, token.end_location(), "expected ident"),
     };
     p.expect(TokenKind::Eq, "=")?;
     if !matches!(p.grammar[node].rule, DUMMY_RULE) {
-        bail!(token.loc, "duplicate rule: `{}`", p.grammar[node].name)
+        let end_loc = token.end_location();
+        let loc = token.loc;
+        bail!(loc, end_loc, "duplicate rule: `{}`", p.grammar[node].name)
     }
 
     let rule = rule(p)?;
@@ -109,9 +138,9 @@ fn node(p: &mut Parser) -> Result<()> {
 }
 
 fn rule(p: &mut Parser) -> Result<Rule> {
-    if let Some(lexer::Token { kind: TokenKind::Pipe, loc }) = p.peek() {
+    if let Some(tok@lexer::Token { kind: TokenKind::Pipe, loc: _ }) = p.peek() {
         bail!(
-            *loc,
+            tok.loc, tok.end_location(),
             "The first element in a sequence of productions or alternatives \
             must not have a leading pipe (`|`)"
         );
@@ -155,7 +184,7 @@ fn atom_rule(p: &mut Parser) -> Result<Rule> {
         Some(it) => Ok(it),
         None => {
             let token = p.bump()?;
-            bail!(token.loc, "unexpected token")
+            bail!(token.loc, token.end_location(), "unexpected token")
         }
     }
 }
@@ -189,8 +218,10 @@ fn opt_atom_rule(p: &mut Parser) -> Result<Option<Rule>> {
                 _ => (),
             }
             let name = name.clone();
+            let tok_range = token.range();
             p.bump()?;
             let node = p.intern_node(name);
+            p.register_node_usage(&node, tok_range);
             Rule::Node(node)
         }
         TokenKind::Token(name) => {

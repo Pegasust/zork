@@ -14,10 +14,43 @@ pub(crate) enum TokenKind {
     RParen,
 }
 
+impl TokenKind {
+    fn size_hint(&self) -> usize {
+        match &self {
+            TokenKind::Node(s) => s.len(),
+            TokenKind::Token(s) => s.len(),
+            TokenKind::Eq => 1,
+            TokenKind::Star => 1,
+            TokenKind::Pipe => 1,
+            TokenKind::QMark => 1,
+            TokenKind::Colon => 1,
+            TokenKind::LParen => 1,
+            TokenKind::RParen => 1,
+            _ => 1,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
     pub(crate) loc: Location,
+}
+
+impl Token {
+    pub(crate) fn end_location(&self) -> Location {
+        Location {
+            line: self.loc.line,
+            column: self.loc.column + self.kind.size_hint()
+        }
+    }
+
+    pub(crate) fn range(&self) -> Range {
+        Range {
+            begin: self.loc,
+            ex_end: self.end_location()
+        }
+    }
 }
 
 /// Source file location
@@ -28,6 +61,18 @@ pub struct Location {
     /// 1-indexed column location
     pub column: usize,
 }
+
+/// Source file range
+#[derive(Debug, Clone)]
+pub struct Range {
+    /// begining of some object - token or node
+    pub begin: Location,
+    /// exclusive ending of some object - token or node. Exclusive end is chosen
+    /// because we want to simulate a selection, where a begin == ex_end is a
+    /// thin cursor
+    pub ex_end: Location,
+}
+
 
 impl Location {
     fn advance(&mut self, text: &str) {

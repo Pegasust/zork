@@ -1,27 +1,49 @@
 //! Boilerplate error definitions.
 use std::fmt;
 
-use crate::lexer::Location;
+use crate::{lexer::Location, lexer::Range};
 
 /// A type alias for std's Result with the Error as our error type.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// An error encountered when parsing a Grammar.
-#[derive(Debug)]
-pub struct Error {
-    /// Error message
-    pub message: String,
-    /// Location of the source file where the error was encountered
-    pub location: Option<Location>,
+#[derive(Debug, Clone)]
+/// Error encountered during parser or so
+pub enum Error {
+    /// Originally given in ungrammar
+    Simple {
+        /// message to report
+        message: String, 
+        /// 0-indexed location of the error
+        location: Option<Location>
+    },
+    /// LSP diagnostic ready variant
+    Range {
+        /// message to report
+        message: String,
+        /// 0-indexed range of the error, simulating an LSP diagnostic error
+        range: Range
+    },
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(loc) = self.location {
-            // Report 1-based indices, to match text editors
-            write!(f, "{}:{}: ", loc.line + 1, loc.column + 1)?
+        match &self {
+            Self::Simple { message, location: Some(loc) } => {
+                // Report 1-based indices, to match text editors
+                write!(f, "{}; {}:{}: ", message, loc.line + 1, loc.column + 1)?;
+            },
+            Self::Simple {message, location: None} => {
+                write!(f, "{}", message)?;
+            },
+            Error::Range { message, range } => {
+                write!(
+                    f, "{message}; {}:{} - {}:{}", 
+                    range.begin.line + 1, range.begin.column+ 1,
+                    range.ex_end.line + 1, range.ex_end.column + 1,
+                )?;
+            },
         }
-        write!(f, "{}", self.message)
+        Ok(())
     }
 }
 
@@ -29,16 +51,16 @@ impl std::error::Error for Error {}
 
 impl Error {
     pub(crate) fn with_location(self, location: Location) -> Error {
-        Error {
-            location: Some(location),
-            ..self
+        match self {
+            Self::Simple { message, location: _ } => Self::Simple {location: Some(location), message},
+            _self@Error::Range {..} => _self,
         }
     }
 }
 
 macro_rules! _format_err {
     ($($tt:tt)*) => {
-        $crate::error::Error {
+        $crate::error::Error::Simple {
             message: format!($($tt)*),
             location: None,
         }

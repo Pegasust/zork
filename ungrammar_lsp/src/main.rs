@@ -20,7 +20,7 @@ use serde_with::with_prefix;
 use tracing_subscriber::{fmt, EnvFilter, Layer};
 use tracing::{instrument, warn, debug, info, error, metadata::LevelFilter};
 
-use ungrammar_fork::Grammar;
+use ungrammar_fork::{Grammar, lexer::Location};
 use serde::Deserialize;
 use sec::Secret;
 
@@ -82,12 +82,15 @@ fn handle_notification(
                     }))?;
                 },
                 Err(err) => {
+                    let err_dbg = err.clone();
+                    let err_diag = err.into_lsp_diagnostic(
+                        Some(DiagnosticSeverity::ERROR),
+                        Some(BINARY_NAME.into()),
+                    );
+                    debug!(parse_err = ?err_dbg, ?err_diag, "Got error");
                     let diag = PublishDiagnosticsParams {
                         uri,
-                        diagnostics: vec![err.into_lsp_diagnostic(
-                            Some(DiagnosticSeverity::ERROR),
-                            Some(BINARY_NAME.into()),
-                        )],
+                        diagnostics: vec![err_diag],
                         version: None,
                     };
                     lsp.sender.send(Message::Notification(NotificationData {
@@ -274,7 +277,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     //     aggregate
     // };
 
-    let _ = {
+    {
         use tracing_subscriber::util::SubscriberInitExt;
         aggregate
             .with_subscriber(
@@ -310,25 +313,57 @@ pub(crate) trait DiagnosticExt {
 }
 
 
+trait TryIntoPositionExt {
+    fn try_into_position(&self) -> color_eyre::Result<Position>;
+}
+
+impl TryIntoPositionExt for Location {
+    fn try_into_position(&self) -> color_eyre::Result<Position> {
+        Ok(Position {
+            line: self.line.try_into()?,
+            character: self.column.try_into()?
+        })
+    }
+}
+
 impl DiagnosticExt for ungrammar_fork::Error {
+    #[instrument]
     fn range(&self) -> Range {
-        match self.location {
-            Some(loc) => {
-                let pos = Position {
-                        line: (loc.line - 1).try_into().unwrap(),
-                        character: (loc.column - 1).try_into().unwrap(),
-                    };
+        match self {
+            ungrammar_fork::Error::Simple{ location: Some(loc), ..} => {
+                let begin = loc.try_into_position().unwrap();
+
+                let end = Position {
+                    line: begin.line,
+                    character: begin.character + 1,
+                };
+                info!{?loc};
                 Range {
-                    start: pos, 
-                    end: pos,
+                    start: begin, 
+                    end,
                 }
             },
-            None => Range::default()
+            ungrammar_fork::Error::Simple { location: None, .. } => {
+                info!{"Encountered None for location of ungrammar_fork::Error::Simple"};
+                Range::default()
+            },
+            ungrammar_fork::Error::Range { range: ungrammar_fork::lexer::Range {
+                begin,
+                ex_end,
+            }, .. } => {
+                Range {
+                    start: begin.try_into_position().unwrap(),
+                    end: ex_end.try_into_position().unwrap(),
+                }
+            }
         }
     }
 
     fn msg(&self) -> String {
-        self.message.clone()
+        match self {
+            ungrammar_fork::Error::Simple { message, location } => message.into(),
+            ungrammar_fork::Error::Range { message, range } => message.into(),
+        }
     }
 }
 
