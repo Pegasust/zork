@@ -6,6 +6,7 @@ EnvSchema {
     use_sandbox: true,
     config_loc: None,
     log_level: "debug",
+    log_loc: None,
     extern_otlp: Some(
         ExternOtlpWrite {
             endpoint: Url {

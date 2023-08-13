@@ -17,7 +17,7 @@ use lsp_types::{
 };
 
 use serde_with::with_prefix;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{fmt, EnvFilter, Layer};
 use tracing::{instrument, warn, debug, info, error, metadata::LevelFilter};
 
 use ungrammar_fork::Grammar;
@@ -212,10 +212,15 @@ with_prefix!(prefix_extern_otlp "extern_otlp_");
 pub(crate) struct EnvSchema {
     #[serde(rename="sandbox", default="sandbox_default")]
     pub(crate) use_sandbox: bool,
+
     #[serde(rename="config", alias="ungrammar_lsp_conf")]
     pub(crate) config_loc: Option<PathBuf>,
+
     #[serde(rename="rust_log", alias="log_level", default="default_rust_log")]
     pub(crate) log_level: String,
+
+    #[serde(rename="log_file")]
+    pub(crate) log_loc: Option<PathBuf>,
 
     #[serde(flatten, with="prefix_extern_otlp")]
     pub(crate) extern_otlp: Option<ExternOtlpWrite>,
@@ -255,10 +260,28 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         }
     };
 
-    fmt::Subscriber::builder()
-        .with_env_filter(filter)
-        .with_writer(std::io::stderr)
-        .try_init()?;
+    let stderr_layer = fmt::layer()
+        .with_writer(std::io::stderr);
+
+    let aggregate = stderr_layer
+        .with_filter(filter);
+
+    // let aggregate = if let Some(log_file) = env.log_loc {
+    //     aggregate.with_filter(
+    //         fmt::layer().with_writer(File::)
+    //     )
+    // } else {
+    //     aggregate
+    // };
+
+    let _ = {
+        use tracing_subscriber::util::SubscriberInitExt;
+        aggregate
+            .with_subscriber(
+                tracing_subscriber::Registry::default()
+            )
+            .try_init()?;
+    };
 
     lsp_main()
 }
@@ -396,5 +419,108 @@ mod tests {
             }"#)
             .expect("Should be valid EnvSchema JSON")
         );
+    }
+}
+
+#[cfg(test)]
+mod join_err_test {
+    use color_eyre::{eyre::eyre, eyre::Report, Section};
+    use thiserror::Error;
+
+    #[test]
+    fn main() {
+        let errors = get_errors();
+        assert!(join_errors(errors).is_err());
+    }
+
+    fn join_errors(results: Vec<Result<(), SourceError>>) -> Result<(), Report> {
+        if results.iter().all(|r| r.is_ok()) {
+            return Ok(());
+        }
+
+        let base_err = eyre!("encountered multiple errors");
+        results
+            .into_iter()
+            .filter(Result::is_err)
+            .map(Result::unwrap_err)
+            .fold(Err(base_err), |report, e| {
+                report.error(e)
+            })
+    }
+
+    /// Helper function to generate errors
+    fn get_errors() -> Vec<Result<(), SourceError>> {
+        vec![
+            Err(SourceError {
+                source: StrError("The task you ran encountered an error"),
+                msg: "The task could not be completed",
+            }),
+            Err(SourceError {
+                source: StrError("The machine you're connecting to is actively on fire"),
+                msg: "The machine is unreachable",
+            }),
+            Err(SourceError {
+                source: StrError("The file you're parsing is literally written in c++ instead of rust, what the hell"),
+                msg: "The file could not be parsed",
+            }),
+        ]
+    }
+
+    /// Arbitrary error type for demonstration purposes
+    #[derive(Debug, Error)]
+    #[error("{0}")]
+    struct StrError(&'static str);
+
+    /// Arbitrary error type for demonstration purposes with a source error
+    #[derive(Debug, Error)]
+    #[error("{msg}")]
+    struct SourceError {
+        msg: &'static str,
+        source: StrError,
+    }
+
+}
+
+
+#[cfg(test)]
+mod tracing_error_test {
+    use tracing::instrument;
+    use tracing_error::{SpanTrace, ExtractSpanTrace, TracedError};
+    #[derive(Debug)]
+    pub struct MyError {
+        message: String,
+        context: SpanTrace,
+        //...
+    }
+    impl std::fmt::Display for MyError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // ... format structured fields
+            self.context.fmt(f)?;
+            // ... format other error context info, cause chain,...
+            Ok(())
+        }
+    }
+    impl std::error::Error for MyError {}
+    impl MyError {
+        pub fn new(msg: String) -> Self {
+            // use 
+            Self {message: msg, context: SpanTrace::capture()}
+        }
+    }
+    // cherry on top: bypass hacky ExtractSpantrace via `dyn Error + 'static`
+    impl ExtractSpanTrace for MyError {
+        fn span_trace(&self) -> Option<&SpanTrace> {
+            Some(&self.context)
+        }
+    }
+
+    #[instrument]
+    fn faulty_function() -> Result<(), MyError> {
+        Err(MyError::new("Something went wrong".into()))
+    }
+
+    #[test]
+    fn should_output_span_trace() {
+
     }
 }

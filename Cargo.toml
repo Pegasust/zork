@@ -29,6 +29,9 @@ xdg = "^2.5.2"
 envy = "^0.4.2"
 insta = "^1.31.0"
 serde_with="^3.2.0"
+color-eyre = "^0.6.2"
+thiserror="^1.0.44"
+tracing-error = "^0.2.0"
 
 [workspace.dependencies.log]
 version = "^0.4.17"

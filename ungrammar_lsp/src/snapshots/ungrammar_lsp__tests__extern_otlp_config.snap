@@ -1,11 +1,12 @@
 ---
 source: ungrammar_lsp/src/main.rs
-expression: parsed
+expression: "serde_json::from_str::<EnvSchema>(r#\"{\n                \"extern_otlp_endpoint\": \"localhost:8440/trace\",\n                \"sandbox\": true\n            }\"#).expect(\"Should be valid EnvSchema JSON\")"
 ---
 EnvSchema {
     use_sandbox: true,
     config_loc: None,
     log_level: "debug",
+    log_loc: None,
     extern_otlp: Some(
         ExternOtlpWrite {
             endpoint: Url {
