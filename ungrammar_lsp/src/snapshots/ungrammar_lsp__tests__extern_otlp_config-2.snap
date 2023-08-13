@@ -1,0 +1,30 @@
+---
+source: ungrammar_lsp/src/main.rs
+expression: "serde_json::from_str::<EnvSchema>(r#\"{\n                \"extern_otlp_endpoint\": \"localhost:8440/trace\",\n                \"sandbox\": true,\n                \"extern_otlp_type\": \"basic\",\n                \"extern_otlp_username\": \"agent\",\n                \"extern_otlp_secret\": \"P\"\n            }\"#).expect(\"Should be valid EnvSchema JSON\")"
+---
+EnvSchema {
+    use_sandbox: true,
+    config_loc: None,
+    log_level: "debug",
+    extern_otlp: Some(
+        ExternOtlpWrite {
+            endpoint: Url {
+                scheme: "localhost",
+                cannot_be_a_base: true,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "8440/trace",
+                query: None,
+                fragment: None,
+            },
+            auth: Some(
+                Basic {
+                    username: "agent",
+                    secret: ...,
+                },
+            ),
+        },
+    ),
+}

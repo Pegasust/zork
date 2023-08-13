@@ -1,0 +1,5 @@
+---
+source: ungrammar_lsp/src/main.rs
+expression: "&json_str"
+---
+"{\"foo_hello\":\"ungrammar_lsp\",\"foo_world\":0}"

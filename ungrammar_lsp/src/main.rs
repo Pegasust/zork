@@ -1,4 +1,4 @@
-use std::{error::Error, io::Read, path::PathBuf};
+use std::{error::Error, io::Read, path::PathBuf, str::FromStr};
 
 use lsp_server::{Connection, Message, Notification as NotificationData, Response};
 use lsp_types::{
@@ -16,10 +16,13 @@ use lsp_types::{
     DidSaveTextDocumentParams, TextDocumentIdentifier
 };
 
+use serde_with::with_prefix;
 use tracing_subscriber::{fmt, EnvFilter};
 use tracing::{instrument, warn, debug, info, error, metadata::LevelFilter};
 
 use ungrammar_fork::Grammar;
+use serde::Deserialize;
+use sec::Secret;
 
 const BINARY_NAME: &str = "ungrammar_lsp";
 
@@ -65,7 +68,6 @@ fn handle_notification(
                 ungrammar_str
             };
             let parse_err = ungrammar_str.parse::<Grammar>();
-            let mut diagnostics: Vec<Diagnostic> = Vec::with_capacity(8);
             match parse_err {
                 Ok(grammar) => {
                     let log_str = format!("Successfully parsed grammar {grammar:?}");
@@ -80,34 +82,47 @@ fn handle_notification(
                     }))?;
                 },
                 Err(err) => {
-                    diagnostics.push(err.into_lsp_diagnostic(
-                        Some(DiagnosticSeverity::ERROR),
-                        Some(BINARY_NAME.into()),
-                    ));
+                    let diag = PublishDiagnosticsParams {
+                        uri,
+                        diagnostics: vec![err.into_lsp_diagnostic(
+                            Some(DiagnosticSeverity::ERROR),
+                            Some(BINARY_NAME.into()),
+                        )],
+                        version: None,
+                    };
+                    lsp.sender.send(Message::Notification(NotificationData {
+                        method: PublishDiagnostics::METHOD.into(),
+                        params: serde_json::to_value(diag)?,
+                    }))?;
                 },
             }
-            let diag = PublishDiagnosticsParams {
-                uri,
-                diagnostics,
-                version: None,
-            };
-            lsp.sender.send(Message::Notification(NotificationData {
-                method: PublishDiagnostics::METHOD.into(),
-                params: serde_json::to_value(diag)?,
-            }))?;
             
         }
         DidChangeTextDocument::METHOD => {
             info! {"Ignore didChange for simplicity"};
-            let params: DidChangeTextDocumentParams = notif.extract(
+            let DidChangeTextDocumentParams {
+                text_document,
+                content_changes: _,
+            }= notif.extract(
                 DidChangeTextDocument::METHOD
             ).unwrap();
 
             let VersionedTextDocumentIdentifier{
-                version: _, uri
-            } = params.text_document;
+                version, uri
+            } = text_document;
 
-            warn!("Not yet handling document changes");
+            warn!(
+                "Not intelligent enough to parse document changes, retracting \
+                all diagnostics"
+            );
+            lsp.sender.send(Message::Notification(NotificationData {
+                method: PublishDiagnostics::METHOD.into(),
+                params: serde_json::to_value(PublishDiagnosticsParams {
+                    uri,
+                    diagnostics: vec![],
+                    version: Some(version),
+                })?,
+            }))?;
 
         },
         ignored => {
@@ -186,23 +201,65 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
     io_threads.join().map_err(Into::into)
 }
 
+const fn sandbox_default() -> bool { false }
+
+fn default_rust_log() -> String { "debug".into() }
+
+fn config_path() -> PathBuf { PathBuf::from("ungrammar_lsp.toml") }
+
+with_prefix!(prefix_extern_otlp "extern_otlp_");
+#[derive(Deserialize, Debug, Default)]
+pub(crate) struct EnvSchema {
+    #[serde(rename="sandbox", default="sandbox_default")]
+    pub(crate) use_sandbox: bool,
+    #[serde(rename="config", alias="ungrammar_lsp_conf")]
+    pub(crate) config_loc: Option<PathBuf>,
+    #[serde(rename="rust_log", alias="log_level", default="default_rust_log")]
+    pub(crate) log_level: String,
+
+    #[serde(flatten, with="prefix_extern_otlp")]
+    pub(crate) extern_otlp: Option<ExternOtlpWrite>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag="type", rename_all="snake_case")]
+pub(crate) enum Auth {
+    Basic {
+        username: String,
+        secret: Secret<String>,
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub(crate) struct ExternOtlpWrite {
+    pub(crate) endpoint: url::Url,
+    #[serde(flatten)]
+    pub(crate) auth: Option<Auth>,
+}
+
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let xdg_dirs = xdg::BaseDirectories::with_prefix(BINARY_NAME);
+    let env: EnvSchema = envy::from_env()?;
+    
     let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::DEBUG.into())
+        .with_default_directive(LevelFilter::from_str(&env.log_level)?.into())
         .from_env_lossy();
+
     let ungrammar_lsp_conf = {
-        match std::env::var("UNGRAMMAR_LSP_CONF") {
-            Ok(e) => PathBuf::from(e),
-            Err(_) => {
-                xdg_dirs?.place_config_file(PathBuf::from("ungrammar_lsp.toml"))?
-            }
+        if let Some(conf_loc) = env.config_loc {
+            conf_loc
+        } else if env.use_sandbox {
+            xdg_dirs?.get_config_file(config_path())
+        } else {
+            xdg_dirs?.place_config_file(config_path())?
         }
     };
+
     fmt::Subscriber::builder()
         .with_env_filter(filter)
         .with_writer(std::io::stderr)
         .try_init()?;
+
     lsp_main()
 }
 pub(crate) trait DiagnosticExt {
@@ -249,5 +306,95 @@ impl DiagnosticExt for ungrammar_fork::Error {
 
     fn msg(&self) -> String {
         self.message.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::{Deserialize, Serialize};
+    use serde_json::Value;
+    use serde_with::with_prefix;
+    use std::fmt::Debug;
+    use std::collections::HashMap;
+
+    #[test]
+    fn prefix_serde() {
+        with_prefix!(pub(crate) prefix_foo "foo_");
+
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+        pub(crate) struct Foo {
+            hello: String,
+            world: u16,
+        }
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+        pub(crate) struct Bar {
+            #[serde(flatten, with="prefix_foo")]
+            foo: Foo
+        }
+
+        
+        assert!(matches! {
+            serde_json::from_str::<Bar>(r#"{
+                "hello": "L",
+                "world": 42
+            }"#),
+            // stderr> missing field "hello" (would have been better if it 
+            // hinted at "foo_hello"; ok for now I guess)
+            Err(_),
+        });
+
+        assert_eq!{
+            serde_json::from_str::<Bar>(r#"{
+                "foo_hello": "L",
+                "foo_world": 42
+            }"#).expect("should be valid Bar obj with prefix foo_"),
+            Bar {
+                foo: Foo {
+                    hello: "L".into(),
+                    world: 42
+                }
+            }
+        };
+
+        let json_str = serde_json::to_string(&Bar {
+            foo: Foo {
+                hello: "ungrammar_lsp".into(),
+                world: 0,
+            }
+        }).expect("Bar should have Serialize implemented");
+        insta::assert_debug_snapshot!(&json_str);
+        assert_eq!(
+            serde_json::from_str::<HashMap<String, Value>>(&json_str)
+                .expect("deserializable into map[str, value]"),
+            {
+                let mut rv = HashMap::<String, Value>::new();
+                rv.insert("foo_hello".into(), "ungrammar_lsp".into());
+                rv.insert("foo_world".into(), 0.into());
+                rv
+            }
+        );
+    }
+
+    #[test]
+    fn extern_otlp_config() {
+        use super::EnvSchema;
+
+        insta::assert_debug_snapshot!(
+            serde_json::from_str::<EnvSchema>(r#"{
+                "extern_otlp_endpoint": "localhost:8440/trace",
+                "sandbox": true
+            }"#)
+            .expect("Should be valid EnvSchema JSON")
+        );
+        insta::assert_debug_snapshot!(
+            serde_json::from_str::<EnvSchema>(r#"{
+                "extern_otlp_endpoint": "localhost:8440/trace",
+                "sandbox": true,
+                "extern_otlp_type": "basic",
+                "extern_otlp_username": "agent",
+                "extern_otlp_secret": "P"
+            }"#)
+            .expect("Should be valid EnvSchema JSON")
+        );
     }
 }
