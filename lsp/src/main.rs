@@ -1,8 +1,8 @@
-mod protocol;
+mod document;
 mod features;
 mod logger;
 mod parser;
-mod document;
+mod protocol;
 
 fn main() {
     println!("Hello, world!!");

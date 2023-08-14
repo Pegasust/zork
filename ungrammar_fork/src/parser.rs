@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     error::{bail, format_err, Result},
-    lexer::{self, TokenKind, Location, Range},
+    lexer::{self, Location, Range, TokenKind},
     Grammar, Node, NodeData, Rule, Token, TokenData,
 };
 
@@ -63,7 +63,12 @@ impl Parser {
     fn expect(&mut self, kind: TokenKind, what: &str) -> Result<()> {
         let token = self.bump()?;
         if token.kind != kind {
-            bail!(token.loc, token.end_location(), "unexpected token, expected `{}`", what);
+            bail!(
+                token.loc,
+                token.end_location(),
+                "unexpected token, expected `{}`",
+                what
+            );
         }
         Ok(())
     }
@@ -73,10 +78,12 @@ impl Parser {
     fn finish(self) -> Result<Grammar> {
         for node_data in &self.grammar.nodes {
             if matches!(node_data.rule, DUMMY_RULE) {
-                let node_ranges = self.node_table.get(&node_data.name)
+                let node_ranges = self
+                    .node_table
+                    .get(&node_data.name)
                     .and_then(|node| self.node_usage.get(node));
                 match node_ranges {
-                    Some(node_ranges) => bail!{
+                    Some(node_ranges) => bail! {
                         node_ranges[0].begin, node_ranges[0].ex_end,
                         "Undefined node {}", node_data.name,
                     },
@@ -87,11 +94,17 @@ impl Parser {
         Ok(self.grammar)
     }
     fn register_node_usage(&mut self, node: &Node, range: Range) {
-        self.node_usage.entry(*node).or_insert(Vec::with_capacity(8)).push(range);
+        self.node_usage
+            .entry(*node)
+            .or_insert(Vec::with_capacity(8))
+            .push(range);
     }
 
     fn register_node_decl(&mut self, node: &Node, range: Range) {
-        self.node_decl.entry(*node).or_insert(Vec::with_capacity(8)).push(range);
+        self.node_decl
+            .entry(*node)
+            .or_insert(Vec::with_capacity(8))
+            .push(range);
     }
 
     fn intern_node(&mut self, name: String) -> Node {
@@ -122,7 +135,7 @@ fn node(p: &mut Parser) -> Result<()> {
             let node = p.intern_node(it.into());
             p.register_node_decl(&node, token.range());
             node
-        },
+        }
         _ => bail!(token.loc, token.end_location(), "expected ident"),
     };
     p.expect(TokenKind::Eq, "=")?;
@@ -138,9 +151,16 @@ fn node(p: &mut Parser) -> Result<()> {
 }
 
 fn rule(p: &mut Parser) -> Result<Rule> {
-    if let Some(tok@lexer::Token { kind: TokenKind::Pipe, loc: _ }) = p.peek() {
+    if let Some(
+        tok @ lexer::Token {
+            kind: TokenKind::Pipe,
+            loc: _,
+        },
+    ) = p.peek()
+    {
         bail!(
-            tok.loc, tok.end_location(),
+            tok.loc,
+            tok.end_location(),
             "The first element in a sequence of productions or alternatives \
             must not have a leading pipe (`|`)"
         );

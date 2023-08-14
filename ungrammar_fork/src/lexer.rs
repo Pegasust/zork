@@ -41,14 +41,14 @@ impl Token {
     pub(crate) fn end_location(&self) -> Location {
         Location {
             line: self.loc.line,
-            column: self.loc.column + self.kind.size_hint()
+            column: self.loc.column + self.kind.size_hint(),
         }
     }
 
     pub(crate) fn range(&self) -> Range {
         Range {
             begin: self.loc,
-            ex_end: self.end_location()
+            ex_end: self.end_location(),
         }
     }
 }
@@ -72,7 +72,6 @@ pub struct Range {
     /// thin cursor
     pub ex_end: Location,
 }
-
 
 impl Location {
     fn advance(&mut self, text: &str) {

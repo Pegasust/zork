@@ -21,3 +21,11 @@ a single workspace.
 
 - Not only local file storage but also maybe object storage or some cloud storage
 
+## `ungrammar_lsp`
+
+It's in alpha right now, it's a simple fork from [`gh:rust-analyzer/ungrammar`
+](https://github.com/rust-analyzer/ungrammar) with a few tweaks to make the
+grammar parser compatible with LSP.
+
+It's a simple project for sandboxing and the development of [`zork_keg.ungram`
+](./markup_ungrams/zork_keg.ungram)

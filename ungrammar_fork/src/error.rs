@@ -12,36 +12,45 @@ pub enum Error {
     /// Originally given in ungrammar
     Simple {
         /// message to report
-        message: String, 
+        message: String,
         /// 0-indexed location of the error
-        location: Option<Location>
+        location: Option<Location>,
     },
     /// LSP diagnostic ready variant
     Range {
         /// message to report
         message: String,
         /// 0-indexed range of the error, simulating an LSP diagnostic error
-        range: Range
+        range: Range,
     },
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Self::Simple { message, location: Some(loc) } => {
+            Self::Simple {
+                message,
+                location: Some(loc),
+            } => {
                 // Report 1-based indices, to match text editors
                 write!(f, "{}; {}:{}: ", message, loc.line + 1, loc.column + 1)?;
-            },
-            Self::Simple {message, location: None} => {
+            }
+            Self::Simple {
+                message,
+                location: None,
+            } => {
                 write!(f, "{}", message)?;
-            },
+            }
             Error::Range { message, range } => {
                 write!(
-                    f, "{message}; {}:{} - {}:{}", 
-                    range.begin.line + 1, range.begin.column+ 1,
-                    range.ex_end.line + 1, range.ex_end.column + 1,
+                    f,
+                    "{message}; {}:{} - {}:{}",
+                    range.begin.line + 1,
+                    range.begin.column + 1,
+                    range.ex_end.line + 1,
+                    range.ex_end.column + 1,
                 )?;
-            },
+            }
         }
         Ok(())
     }
@@ -52,8 +61,14 @@ impl std::error::Error for Error {}
 impl Error {
     pub(crate) fn with_location(self, location: Location) -> Error {
         match self {
-            Self::Simple { message, location: _ } => Self::Simple {location: Some(location), message},
-            _self@Error::Range {..} => _self,
+            Self::Simple {
+                message,
+                location: _,
+            } => Self::Simple {
+                location: Some(location),
+                message,
+            },
+            _self @ Error::Range { .. } => _self,
         }
     }
 }

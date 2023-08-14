@@ -1,7 +1,9 @@
 # Neovim lspconfig dev environment
 
+Ensure `nvim-lspconfig` configured and loaded in nvim.
 
-Ensure `nvim-lspconfig` configured and loaded in nvim
+The following guide focuses on `ungrammar_lsp` since that's the working (canary)
+LSP for now.
 
 ## Plug and its nix-compatible `WPlug`
 ```lua
@@ -30,7 +32,12 @@ local function ensure_ungrammar_lspconfig()
   if not configs['ungrammar_lsp'] then
     configs['ungrammar_lsp'] = {
       default_config = {
+        -- This is one way to use nix to launch, which might take time
         cmd = { "nix", "run", "github:pegasust/zork#ungrammar_lsp" },
+        -- Another way ordinary way is just to rely on $PATH linking
+        -- I currently just use zork's devShells.$system.htran for ungrammar_lsp
+        cmd = {"ungrammar_lsp"},
+
         filetypes = { "ungrammar", "ungram" },
         root_dir = lspconfig.util.root_pattern(".git", ".ungram"),
         settings = {
@@ -61,9 +68,6 @@ local function setup_ungrammar_handler()
     },
   }
 end
-
-
-ensure_ungrammar_lspconfig()
 
 setup_ungrammar_handler()
 ```

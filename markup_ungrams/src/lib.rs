@@ -1,6 +1,6 @@
 //! Canonical model of markup supported by Zork
 
-use ungrammar::{Grammar, Error};
+use ungrammar::{Error, Grammar};
 
 pub struct ZorkKind<'a> {
     // alias -> canonical name
@@ -11,42 +11,35 @@ pub struct ZorkKind<'a> {
 pub const ZORK_KIND: ZorkKind = ZorkKind {
     codelangs_alias: &[
         // alias       canon
-        ("markdown",   "markdown"),
-        ("md",         "markdown"),
-
-        ("python",     "python"),
-        ("python3",    "python"),
-        ("py",         "python"),
-        ("py3",        "python"),
-
-        ("rust",       "rust"),
-        ("rs",         "rust"),
-
-        ("shell",      "sh"),
-        ("sh",         "sh"),
-
+        ("markdown", "markdown"),
+        ("md", "markdown"),
+        ("python", "python"),
+        ("python3", "python"),
+        ("py", "python"),
+        ("py3", "python"),
+        ("rust", "rust"),
+        ("rs", "rust"),
+        ("shell", "sh"),
+        ("sh", "sh"),
         ("typescript", "typescript"),
-        ("ts",         "typescript"),
+        ("ts", "typescript"),
     ],
 
     punct_trans: &[
         // literal   variant
-        ("b#",       "BlockIdHashLead"),
-        ("b$",       "BlockContentHashlead"),
-
-        ("#",        "HeaderBlockLead"),
-
-        ("|",        "QuoteBlockLead"),
-        (">",        "QuoteBlocklead"),
-
-        ("/",        "AbsoluteLinuxPathLead"),
-        ("./",       "RelativeLinuxPathLead"),
+        ("b#", "BlockIdHashLead"),
+        ("b$", "BlockContentHashlead"),
+        ("#", "HeaderBlockLead"),
+        ("|", "QuoteBlockLead"),
+        (">", "QuoteBlocklead"),
+        ("/", "AbsoluteLinuxPathLead"),
+        ("./", "RelativeLinuxPathLead"),
     ],
 };
 
 pub fn zork_grammar() -> Result<Grammar, Error> {
     let grammar = include_str!("../zork_keg.ungram");
-    
+
     grammar.parse::<Grammar>()
 }
 

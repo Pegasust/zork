@@ -5,7 +5,7 @@ Grammar =
 Node =
   name:'ident' '=' Rule
 
-ule =
+Rule =
   'ident'
 | 'token_ident'
 | Rule *

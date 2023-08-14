@@ -2,45 +2,39 @@ use std::{error::Error, io::Read, path::PathBuf, str::FromStr};
 
 use lsp_server::{Connection, Message, Notification as NotificationData, Response};
 use lsp_types::{
-    InitializeParams, ClientCapabilities, ServerCapabilities, 
-    TextDocumentSyncCapability, TextDocumentSyncKind, 
     notification::{
-        DidChangeTextDocument, Notification, LogMessage, PublishDiagnostics, 
-        DidSaveTextDocument
-    }, 
-    DidChangeTextDocumentParams, VersionedTextDocumentIdentifier, 
-    LogMessageParams, MessageType, PublishDiagnosticsParams, Diagnostic, 
-    DiagnosticSeverity, Range,  Position, request::{
-        Shutdown, Request
-    }, 
-    DidSaveTextDocumentParams, TextDocumentIdentifier
+        DidChangeTextDocument, DidSaveTextDocument, LogMessage, Notification, PublishDiagnostics,
+    },
+    request::{Request, Shutdown},
+    ClientCapabilities, Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams,
+    DidSaveTextDocumentParams, InitializeParams, LogMessageParams, MessageType, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentIdentifier,
+    TextDocumentSyncCapability, TextDocumentSyncKind, VersionedTextDocumentIdentifier,
 };
 
 use serde_with::with_prefix;
+use tracing::{debug, error, info, instrument, metadata::LevelFilter, warn};
 use tracing_subscriber::{fmt, EnvFilter, Layer};
-use tracing::{instrument, warn, debug, info, error, metadata::LevelFilter};
 
-use ungrammar_fork::{Grammar, lexer::Location};
-use serde::Deserialize;
 use sec::Secret;
+use serde::Deserialize;
+use ungrammar_fork::{lexer::Location, Grammar};
 
 const BINARY_NAME: &str = "ungrammar_lsp";
 
 #[instrument(skip(lsp))]
 fn handle_notification(
     notif: NotificationData,
-    lsp: &Connection
+    lsp: &Connection,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let method: &str = &notif.method;
     debug! {?notif, "got notification"};
     match method {
         DidSaveTextDocument::METHOD => {
             let DidSaveTextDocumentParams {
-                text_document: TextDocumentIdentifier {uri},
-                text
-            } = notif.extract(
-                DidSaveTextDocument::METHOD
-            )?;
+                text_document: TextDocumentIdentifier { uri },
+                text,
+            } = notif.extract(DidSaveTextDocument::METHOD)?;
             let ungrammar_str = if let Some(text) = text {
                 text
             } else {
@@ -52,7 +46,7 @@ fn handle_notification(
                 if uri.scheme() != "file" {
                     let scheme = uri.scheme();
                     warn!("Got {uri} not supported uri scheme {scheme}");
-                    let log_msg = LogMessageParams{
+                    let log_msg = LogMessageParams {
                         typ: MessageType::WARNING,
                         message: format!("Only support file:// schema, got {uri}"),
                     };
@@ -80,7 +74,7 @@ fn handle_notification(
                         method: LogMessage::METHOD.into(),
                         params: serde_json::to_value(log_msg)?,
                     }))?;
-                },
+                }
                 Err(err) => {
                     let err_dbg = err.clone();
                     let err_diag = err.into_lsp_diagnostic(
@@ -97,22 +91,17 @@ fn handle_notification(
                         method: PublishDiagnostics::METHOD.into(),
                         params: serde_json::to_value(diag)?,
                     }))?;
-                },
+                }
             }
-            
         }
         DidChangeTextDocument::METHOD => {
             info! {"Ignore didChange for simplicity"};
             let DidChangeTextDocumentParams {
                 text_document,
                 content_changes: _,
-            }= notif.extract(
-                DidChangeTextDocument::METHOD
-            ).unwrap();
+            } = notif.extract(DidChangeTextDocument::METHOD).unwrap();
 
-            let VersionedTextDocumentIdentifier{
-                version, uri
-            } = text_document;
+            let VersionedTextDocumentIdentifier { version, uri } = text_document;
 
             warn!(
                 "Not intelligent enough to parse document changes, retracting \
@@ -126,22 +115,19 @@ fn handle_notification(
                     version: Some(version),
                 })?,
             }))?;
-
-        },
+        }
         ignored => {
-            warn!(
-                "Unhandled method {ignored:?} {notif:?}. Might be bad capabilities."
-            );
+            warn!("Unhandled method {ignored:?} {notif:?}. Might be bad capabilities.");
         }
     }
     Ok(())
 }
 
 #[instrument]
-fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
-    debug!{"pre: init stdio connection"};
+fn lsp_main() -> Result<(), Box<dyn Error + Sync + Send>> {
+    debug! {"pre: init stdio connection"};
     let (connection, io_threads) = Connection::stdio();
-    debug!{"post: init stdio connection"};
+    debug! {"post: init stdio connection"};
 
     // Run the server
     let (id, params) = connection.initialize_start()?;
@@ -150,13 +136,9 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
     let client_capabilities: ClientCapabilities = init_params.capabilities;
     info! {"Client cap: {client_capabilities:?}"};
     let server_capabilities = ServerCapabilities {
-        text_document_sync: Some(
-            TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
-        ),
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         ..Default::default()
     };
-
-
 
     info! {"Server cap: {server_capabilities:?}"};
     // TODO: This is fine because negotiated capabilities will always be
@@ -173,10 +155,10 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
     connection.initialize_finish(id, initialize_data)?;
     // Main loop where the LSP server listens for client messages.
     for message in &connection.receiver {
-        debug!{"received {message:?}"}
+        debug! {"received {message:?}"}
         match message {
             Message::Request(req) if req.method == Shutdown::METHOD => {
-                info!{"shutdown initiated"};
+                info! {"shutdown initiated"};
                 connection.sender.send(Message::Response(Response {
                     id: req.id,
                     result: None,
@@ -197,45 +179,51 @@ fn lsp_main() ->Result<(), Box<dyn Error + Sync + Send>>  {
                 }
             }
             ignore => {
-                info!{"ignoring {ignore:?}"};
+                info! {"ignoring {ignore:?}"};
             }
         }
     }
     io_threads.join().map_err(Into::into)
 }
 
-const fn sandbox_default() -> bool { false }
+const fn sandbox_default() -> bool {
+    false
+}
 
-fn default_rust_log() -> String { "debug".into() }
+fn default_rust_log() -> String {
+    "debug".into()
+}
 
-fn config_path() -> PathBuf { PathBuf::from("ungrammar_lsp.toml") }
+fn config_path() -> PathBuf {
+    PathBuf::from("ungrammar_lsp.toml")
+}
 
 with_prefix!(prefix_extern_otlp "extern_otlp_");
 #[derive(Deserialize, Debug, Default)]
 pub(crate) struct EnvSchema {
-    #[serde(rename="sandbox", default="sandbox_default")]
+    #[serde(rename = "sandbox", default = "sandbox_default")]
     pub(crate) use_sandbox: bool,
 
-    #[serde(rename="config", alias="ungrammar_lsp_conf")]
+    #[serde(rename = "config", alias = "ungrammar_lsp_conf")]
     pub(crate) config_loc: Option<PathBuf>,
 
-    #[serde(rename="rust_log", alias="log_level", default="default_rust_log")]
+    #[serde(rename = "rust_log", alias = "log_level", default = "default_rust_log")]
     pub(crate) log_level: String,
 
-    #[serde(rename="log_file")]
+    #[serde(rename = "log_file")]
     pub(crate) log_loc: Option<PathBuf>,
 
-    #[serde(flatten, with="prefix_extern_otlp")]
+    #[serde(flatten, with = "prefix_extern_otlp")]
     pub(crate) extern_otlp: Option<ExternOtlpWrite>,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(tag="type", rename_all="snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub(crate) enum Auth {
     Basic {
         username: String,
         secret: Secret<String>,
-    }
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -248,7 +236,7 @@ pub(crate) struct ExternOtlpWrite {
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let xdg_dirs = xdg::BaseDirectories::with_prefix(BINARY_NAME);
     let env: EnvSchema = envy::from_env()?;
-    
+
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::from_str(&env.log_level)?.into())
         .from_env_lossy();
@@ -263,11 +251,9 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         }
     };
 
-    let stderr_layer = fmt::layer()
-        .with_writer(std::io::stderr);
+    let stderr_layer = fmt::layer().with_writer(std::io::stderr);
 
-    let aggregate = stderr_layer
-        .with_filter(filter);
+    let aggregate = stderr_layer.with_filter(filter);
 
     // let aggregate = if let Some(log_file) = env.log_loc {
     //     aggregate.with_filter(
@@ -280,9 +266,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     {
         use tracing_subscriber::util::SubscriberInitExt;
         aggregate
-            .with_subscriber(
-                tracing_subscriber::Registry::default()
-            )
+            .with_subscriber(tracing_subscriber::Registry::default())
             .try_init()?;
     };
 
@@ -292,12 +276,14 @@ pub(crate) trait DiagnosticExt {
     fn range(&self) -> Range;
     fn msg(&self) -> String;
     fn into_lsp_diagnostic(
-        self, 
+        self,
         severity: Option<DiagnosticSeverity>,
         source: Option<String>,
-    ) -> Diagnostic 
-    where Self: Sized {
-        Diagnostic { 
+    ) -> Diagnostic
+    where
+        Self: Sized,
+    {
+        Diagnostic {
             range: self.range(),
             message: self.msg(),
             severity,
@@ -312,7 +298,6 @@ pub(crate) trait DiagnosticExt {
     }
 }
 
-
 trait TryIntoPositionExt {
     fn try_into_position(&self) -> color_eyre::Result<Position>;
 }
@@ -321,7 +306,7 @@ impl TryIntoPositionExt for Location {
     fn try_into_position(&self) -> color_eyre::Result<Position> {
         Ok(Position {
             line: self.line.try_into()?,
-            character: self.column.try_into()?
+            character: self.column.try_into()?,
         })
     }
 }
@@ -330,32 +315,30 @@ impl DiagnosticExt for ungrammar_fork::Error {
     #[instrument]
     fn range(&self) -> Range {
         match self {
-            ungrammar_fork::Error::Simple{ location: Some(loc), ..} => {
+            ungrammar_fork::Error::Simple {
+                location: Some(loc),
+                ..
+            } => {
                 let begin = loc.try_into_position().unwrap();
 
                 let end = Position {
                     line: begin.line,
                     character: begin.character + 1,
                 };
-                info!{?loc};
-                Range {
-                    start: begin, 
-                    end,
-                }
-            },
-            ungrammar_fork::Error::Simple { location: None, .. } => {
-                info!{"Encountered None for location of ungrammar_fork::Error::Simple"};
-                Range::default()
-            },
-            ungrammar_fork::Error::Range { range: ungrammar_fork::lexer::Range {
-                begin,
-                ex_end,
-            }, .. } => {
-                Range {
-                    start: begin.try_into_position().unwrap(),
-                    end: ex_end.try_into_position().unwrap(),
-                }
+                info! {?loc};
+                Range { start: begin, end }
             }
+            ungrammar_fork::Error::Simple { location: None, .. } => {
+                info! {"Encountered None for location of ungrammar_fork::Error::Simple"};
+                Range::default()
+            }
+            ungrammar_fork::Error::Range {
+                range: ungrammar_fork::lexer::Range { begin, ex_end },
+                ..
+            } => Range {
+                start: begin.try_into_position().unwrap(),
+                end: ex_end.try_into_position().unwrap(),
+            },
         }
     }
 
@@ -372,8 +355,8 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use serde_json::Value;
     use serde_with::with_prefix;
-    use std::fmt::Debug;
     use std::collections::HashMap;
+    use std::fmt::Debug;
 
     #[test]
     fn prefix_serde() {
@@ -386,22 +369,21 @@ mod tests {
         }
         #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
         pub(crate) struct Bar {
-            #[serde(flatten, with="prefix_foo")]
-            foo: Foo
+            #[serde(flatten, with = "prefix_foo")]
+            foo: Foo,
         }
 
-        
         assert!(matches! {
             serde_json::from_str::<Bar>(r#"{
                 "hello": "L",
                 "world": 42
             }"#),
-            // stderr> missing field "hello" (would have been better if it 
+            // stderr> missing field "hello" (would have been better if it
             // hinted at "foo_hello"; ok for now I guess)
             Err(_),
         });
 
-        assert_eq!{
+        assert_eq! {
             serde_json::from_str::<Bar>(r#"{
                 "foo_hello": "L",
                 "foo_world": 42
@@ -418,8 +400,9 @@ mod tests {
             foo: Foo {
                 hello: "ungrammar_lsp".into(),
                 world: 0,
-            }
-        }).expect("Bar should have Serialize implemented");
+            },
+        })
+        .expect("Bar should have Serialize implemented");
         insta::assert_debug_snapshot!(&json_str);
         assert_eq!(
             serde_json::from_str::<HashMap<String, Value>>(&json_str)
@@ -437,23 +420,23 @@ mod tests {
     fn extern_otlp_config() {
         use super::EnvSchema;
 
-        insta::assert_debug_snapshot!(
-            serde_json::from_str::<EnvSchema>(r#"{
+        insta::assert_debug_snapshot!(serde_json::from_str::<EnvSchema>(
+            r#"{
                 "extern_otlp_endpoint": "localhost:8440/trace",
                 "sandbox": true
-            }"#)
-            .expect("Should be valid EnvSchema JSON")
-        );
-        insta::assert_debug_snapshot!(
-            serde_json::from_str::<EnvSchema>(r#"{
+            }"#
+        )
+        .expect("Should be valid EnvSchema JSON"));
+        insta::assert_debug_snapshot!(serde_json::from_str::<EnvSchema>(
+            r#"{
                 "extern_otlp_endpoint": "localhost:8440/trace",
                 "sandbox": true,
                 "extern_otlp_type": "basic",
                 "extern_otlp_username": "agent",
                 "extern_otlp_secret": "P"
-            }"#)
-            .expect("Should be valid EnvSchema JSON")
-        );
+            }"#
+        )
+        .expect("Should be valid EnvSchema JSON"));
     }
 }
 
@@ -478,9 +461,7 @@ mod join_err_test {
             .into_iter()
             .filter(Result::is_err)
             .map(Result::unwrap_err)
-            .fold(Err(base_err), |report, e| {
-                report.error(e)
-            })
+            .fold(Err(base_err), |report, e| report.error(e))
     }
 
     /// Helper function to generate errors
@@ -513,33 +494,34 @@ mod join_err_test {
         msg: &'static str,
         source: StrError,
     }
-
 }
 
-
 #[cfg(test)]
-mod tracing_error_test {
-    use tracing::instrument;
-    use tracing_error::{SpanTrace, ExtractSpanTrace, TracedError};
-    #[derive(Debug)]
-    pub struct MyError {
+pub(crate) mod tracing_err_setup {
+    use std::{io:: Write, sync::{Arc, Mutex}};
+    use tracing::{instrument, error};
+    use tracing_error::{ExtractSpanTrace, SpanTrace};
+    use tracing_subscriber::{fmt::MakeWriter};
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct MyError {
         message: String,
         context: SpanTrace,
-        //...
     }
     impl std::fmt::Display for MyError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            // ... format structured fields
             self.context.fmt(f)?;
-            // ... format other error context info, cause chain,...
             Ok(())
         }
     }
     impl std::error::Error for MyError {}
     impl MyError {
+        #[instrument(level="warn")]
         pub fn new(msg: String) -> Self {
-            // use 
-            Self {message: msg, context: SpanTrace::capture()}
+            Self {
+                message: msg,
+                context: SpanTrace::capture(),
+            }
         }
     }
     // cherry on top: bypass hacky ExtractSpantrace via `dyn Error + 'static`
@@ -548,14 +530,110 @@ mod tracing_error_test {
             Some(&self.context)
         }
     }
-
     #[instrument]
-    fn faulty_function() -> Result<(), MyError> {
+    pub(crate) fn faulty_function() -> Result<(), MyError> {
+        error!("Something went wrong");
         Err(MyError::new("Something went wrong".into()))
     }
 
+    // NOTE: no need for BufWriter wrapper since there is no syscall or io
+    // NOTE: use Arc<Mutex> to share a single Vec. `make_writer` clones
+    // inner struct, so to keep original string buffer written in a single
+    // test, we need these alien containers
+    pub(crate) struct VecWriter(pub(crate) Arc<Mutex<Vec<u8>>>);
+
+    impl Write for VecWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl MakeWriter<'_> for VecWriter {
+        type Writer = VecWriter;
+
+        fn make_writer(&self) -> Self::Writer {
+            VecWriter(self.0.clone())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tracing_error_test {
+    use std::sync::{Arc, Mutex};
+
+    use insta::assert_display_snapshot;
+    use tracing_error::{ErrorLayer, ExtractSpanTrace};
+    use tracing_subscriber::{Layer, Registry};
+
+    use crate::tracing_err_setup::{VecWriter, faulty_function};
+
     #[test]
     fn should_output_span_trace() {
+        let str_buf = Arc::new(Mutex::new(Vec::new()));
+        let str_write = VecWriter(str_buf.clone());
+        let layer = tracing_subscriber::fmt::layer()
+            .with_writer(str_write)
+            .without_time()
+            .and_then(ErrorLayer::default())
+            .with_subscriber(Registry::default());
+        
+        let _guard = {
+            use tracing_subscriber::util::SubscriberInitExt;
+            layer.set_default()
+        };
 
+        let err = faulty_function().unwrap_err();
+        let output = format!(
+            "Error: {err:?}\nExtractSpanTrace::span_trace: {:?}", 
+            err.span_trace().unwrap()
+        );
+        let output = format!(
+            "{output}\n=== Subscriber ===\n{}",
+            String::from_utf8(str_buf.lock().unwrap().to_vec()).unwrap()
+        );
+        assert_display_snapshot!(output);
+
+    }
+
+}
+
+#[cfg(test)]
+mod alt_tracing_error_test {
+    use std::sync::{Arc, Mutex};
+
+    use insta::assert_display_snapshot;
+    use tracing_error::{ErrorLayer, ExtractSpanTrace};
+    use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+
+    use crate::tracing_err_setup::{VecWriter, faulty_function};
+
+
+    #[test]
+    fn alt_init() {
+        // shows off alternative way to init multiple layers
+        let str_buf = Arc::new(Mutex::new(Vec::new()));
+        let str_write = VecWriter(str_buf.clone());
+        let registry = tracing_subscriber::Registry::default()
+            .with(ErrorLayer::default())
+            .with(tracing_subscriber::fmt::layer()
+                .with_writer(str_write)
+                .without_time());
+        let _guard = tracing::subscriber::set_default(registry);
+
+        let err = faulty_function().unwrap_err();
+        let output = format!(
+            "Error: {err:?}\nExtractSpanTrace::span_trace: {:?}", 
+            err.span_trace().unwrap()
+        );
+        let output = format!(
+            "{output}\n=== Subscriber ===\n{}",
+            String::from_utf8(str_buf.lock().unwrap().to_vec()).unwrap()
+        );
+        assert_display_snapshot!(output);
     }
 }

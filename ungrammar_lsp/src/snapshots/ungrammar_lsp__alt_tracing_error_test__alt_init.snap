@@ -1,0 +1,9 @@
+---
+source: ungrammar_lsp/src/main.rs
+expression: output
+---
+Error: MyError { message: "Something went wrong", context: SpanTrace [{ target: "ungrammar_lsp::tracing_err_setup", name: "new", fields: "msg=\"Something went wrong\"", file: "ungrammar_lsp/src/main.rs", line: 519 }, { target: "ungrammar_lsp::tracing_err_setup", name: "faulty_function", file: "ungrammar_lsp/src/main.rs", line: 533 }] }
+ExtractSpanTrace::span_trace: SpanTrace [{ target: "ungrammar_lsp::tracing_err_setup", name: "new", fields: "msg=\"Something went wrong\"", file: "ungrammar_lsp/src/main.rs", line: 519 }, { target: "ungrammar_lsp::tracing_err_setup", name: "faulty_function", file: "ungrammar_lsp/src/main.rs", line: 533 }]
+=== Subscriber ===
+ERROR faulty_function: ungrammar_lsp::tracing_err_setup: Something went wrong
+
